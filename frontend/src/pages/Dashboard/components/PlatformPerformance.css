@@ -1,0 +1,176 @@
+.platform-panel {
+  min-height: 360px;
+}
+
+.platform-header-icon {
+  width: 36px;
+  height: 36px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 10px;
+
+  color: #7dc8c0;
+
+  background:
+    rgba(105, 190, 181, 0.07);
+}
+
+.platform-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 22px;
+}
+
+.platform-row {
+  opacity: 0;
+
+  animation:
+    platformEnter
+    0.5s
+    ease
+    forwards;
+}
+
+.platform-row-top {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 9px;
+}
+
+.platform-name {
+  display: flex;
+
+  align-items: center;
+
+  gap: 9px;
+}
+
+.platform-name strong {
+  color: #dce8e7;
+
+  font-size: 12px;
+}
+
+.platform-row-top > span {
+  color: #71888c;
+
+  font-size: 10px;
+}
+
+.platform-mini-icon {
+  width: 29px;
+  height: 29px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 8px;
+
+  color: #8dcfc8;
+
+  background:
+    rgba(106, 191, 182, 0.08);
+
+  font-size: 12px;
+
+  font-weight: 800;
+}
+
+.platform-progress {
+  width: 100%;
+  height: 5px;
+
+  overflow: hidden;
+
+  border-radius: 20px;
+
+  background:
+    rgba(255, 255, 255, 0.045);
+}
+
+.platform-progress-fill {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #4f8e91,
+      #79c9bf
+    );
+
+  transform-origin: left;
+
+  animation:
+    progressGrow
+    0.9s
+    cubic-bezier(0.2, 0.8, 0.2, 1)
+    both;
+}
+
+.platform-stats {
+  display: flex;
+
+  align-items: center;
+
+  gap: 13px;
+
+  margin-top: 8px;
+}
+
+.platform-stats span {
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  color: #6d8589;
+
+  font-size: 9px;
+}
+
+.platform-stats svg {
+  color: #6fc1b8;
+}
+
+.platform-stats .failed-stat svg {
+  color: #c77e7e;
+}
+
+@keyframes platformEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+}
+
+@keyframes progressGrow {
+  from {
+    transform:
+      scaleX(0);
+  }
+
+  to {
+    transform:
+      scaleX(1);
+  }
+}

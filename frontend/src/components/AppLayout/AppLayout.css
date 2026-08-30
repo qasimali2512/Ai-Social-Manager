@@ -1,0 +1,50 @@
+.app-shell {
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 80% 0%,
+      rgba(73, 145, 144, 0.05),
+      transparent 30%
+    ),
+    #07121b;
+}
+
+.app-main {
+  min-height: 100vh;
+
+  margin-left: 258px;
+}
+
+.page-content {
+  width: 100%;
+  min-height: calc(100vh - 82px);
+
+  padding: 26px;
+
+  animation: contentEnter 0.45s ease both;
+}
+
+@keyframes contentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 850px) {
+  .app-main {
+    margin-left: 0;
+  }
+
+  .page-content {
+    min-height: calc(100vh - 70px);
+
+    padding: 20px 15px;
+  }
+}

@@ -1,0 +1,190 @@
+.stat-card {
+  position: relative;
+
+  min-height: 156px;
+
+  padding: 21px;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  border: 1px solid
+    rgba(133, 203, 197, 0.1);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(20, 38, 47, 0.9),
+      rgba(10, 23, 31, 0.92)
+    );
+
+  box-shadow:
+    0 15px 45px
+      rgba(0, 0, 0, 0.12);
+
+  opacity: 0;
+
+  animation:
+    statCardEnter
+    0.55s
+    cubic-bezier(0.2, 0.8, 0.2, 1)
+    forwards;
+
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.stat-card::before {
+  content: "";
+
+  position: absolute;
+
+  width: 130px;
+  height: 130px;
+
+  top: -65px;
+  right: -65px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(102, 193, 184, 0.07);
+
+  transition: 0.4s ease;
+}
+
+.stat-card:hover {
+  transform:
+    translateY(-6px);
+
+  border-color:
+    rgba(125, 204, 197, 0.22);
+
+  box-shadow:
+    0 22px 55px
+      rgba(0, 0, 0, 0.22);
+}
+
+.stat-card:hover::before {
+  transform: scale(1.35);
+}
+
+.stat-card-top {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+}
+
+.stat-icon {
+  width: 43px;
+  height: 43px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 12px;
+
+  color: #82d1c8;
+
+  background:
+    rgba(100, 190, 181, 0.09);
+
+  border: 1px solid
+    rgba(120, 204, 197, 0.11);
+
+  transition: 0.3s ease;
+}
+
+.stat-card:hover .stat-icon {
+  transform:
+    rotate(-5deg)
+    scale(1.08);
+
+  background:
+    rgba(100, 190, 181, 0.14);
+}
+
+.stat-trend {
+  display: flex;
+
+  align-items: center;
+
+  gap: 3px;
+
+  padding: 5px 8px;
+
+  border-radius: 8px;
+
+  background:
+    rgba(93, 190, 170, 0.08);
+
+  color: #79cbb9;
+
+  font-size: 11px;
+
+  font-weight: 700;
+}
+
+.stat-trend.negative {
+  color: #d28e8e;
+
+  background:
+    rgba(205, 100, 100, 0.08);
+}
+
+.stat-content {
+  display: flex;
+
+  flex-direction: column;
+
+  margin-top: 17px;
+}
+
+.stat-title {
+  color: #80969b;
+
+  font-size: 12px;
+}
+
+.stat-value {
+  margin-top: 5px;
+
+  color: #eef8f7;
+
+  font-size: 29px;
+
+  line-height: 1;
+
+  letter-spacing: -1px;
+}
+
+.stat-subtitle {
+  margin-top: 8px;
+
+  color: #62797e;
+
+  font-size: 11px;
+}
+
+@keyframes statCardEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(22px)
+      scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}

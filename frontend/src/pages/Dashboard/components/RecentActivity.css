@@ -1,0 +1,167 @@
+.recent-panel {
+  min-height: 360px;
+}
+
+.activity-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.activity-item {
+  display: grid;
+
+  grid-template-columns:
+    37px
+    1fr
+    auto
+    auto;
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 10px;
+
+  border-radius: 11px;
+
+  background:
+    rgba(255, 255, 255, 0.02);
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.035);
+
+  opacity: 0;
+
+  animation:
+    activityEnter
+    0.45s
+    ease
+    forwards;
+
+  transition: 0.25s ease;
+}
+
+.activity-item:hover {
+  transform:
+    translateX(4px);
+
+  background:
+    rgba(106, 190, 182, 0.045);
+}
+
+.activity-icon {
+  width: 35px;
+  height: 35px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 9px;
+
+  color: #78c7bd;
+
+  background:
+    rgba(108, 193, 184, 0.08);
+}
+
+.activity-item.failed
+  .activity-icon {
+  color: #d88d8d;
+
+  background:
+    rgba(216, 141, 141, 0.08);
+}
+
+.activity-main {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+.activity-main strong {
+  color: #d9e6e5;
+
+  font-size: 11px;
+}
+
+.activity-main span {
+  color: #61777c;
+
+  font-size: 9px;
+}
+
+.activity-date {
+  color: #70868a;
+
+  font-size: 9px;
+}
+
+.activity-status {
+  min-width: 57px;
+
+  padding: 5px 7px;
+
+  border-radius: 7px;
+
+  text-align: center;
+
+  color: #74bdb5;
+
+  background:
+    rgba(116, 189, 181, 0.07);
+
+  font-size: 8px;
+
+  text-transform: capitalize;
+}
+
+.activity-item.failed
+  .activity-status {
+  color: #d98c8c;
+
+  background:
+    rgba(217, 140, 140, 0.07);
+}
+
+.activity-item.scheduled
+  .activity-status {
+  color: #d1b06e;
+
+  background:
+    rgba(209, 176, 110, 0.07);
+}
+
+@keyframes activityEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0);
+  }
+}
+
+@media (max-width: 650px) {
+  .activity-item {
+    grid-template-columns:
+      37px
+      1fr
+      auto;
+  }
+
+  .activity-date {
+    display: none;
+  }
+}
