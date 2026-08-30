@@ -88,11 +88,6 @@ function ProtectedApp() {
             element={<Settings />}
           />
 
-          <Route
-            path="/privacy-policy"
-            element={<PrivacyPolicy />}
-          />
-
           {/* Unknown protected route */}
           <Route
             path="*"
@@ -146,6 +141,12 @@ function App() {
           <Route
             path="/reset-password"
             element={<ResetPassword />}
+          />
+
+          {/* PUBLIC PRIVACY POLICY */}
+          <Route
+            path="/privacy-policy"
+            element={<PrivacyPolicy />}
           />
 
           {/* =========================
