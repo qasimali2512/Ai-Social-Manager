@@ -1,187 +1,33 @@
-from datetime import date
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
-from fastapi import (
-    APIRouter,
-    HTTPException,
-    Query,
-)
+from app.services.analytics_service import DEV_USER_ID, get_full_analytics
 
-from app.schemas.analytics import (
-    AnalyticsResponse,
-)
-
-from app.services.analytics_service import (
-    get_analytics,
-    get_overview,
-    get_platform_analytics,
-    get_daily_analytics,
-)
+router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
-router = APIRouter(
-    prefix="/api/analytics",
-    tags=["Analytics"],
-)
+class AnalyticsQuery(BaseModel):
+    days: int = Field(default=30, ge=1, le=365)
 
 
-# ------------------------------------------------------------
-# Temporary user until OAuth/authentication phase
-# ------------------------------------------------------------
-
-DEV_USER_ID = (
-    "00000000-0000-0000-0000-000000000001"
-)
-
-
-@router.get(
-    "",
-    response_model=AnalyticsResponse,
-)
-def analytics(
-    start_date: date | None = Query(
-        default=None
-    ),
-    end_date: date | None = Query(
-        default=None
-    ),
-):
-    if (
-        start_date
-        and end_date
-        and start_date > end_date
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "start_date cannot be "
-                "after end_date."
-            ),
-        )
-
+@router.get("/")
+def analytics(days: int = 30):
     try:
+        return get_full_analytics(days=days, user_id=DEV_USER_ID)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analytics could not be loaded: {exc}")
 
-        data = get_analytics(
-            user_id=DEV_USER_ID,
-            start_date=start_date,
-            end_date=end_date,
-        )
 
+@router.post("/sync")
+def sync_analytics(request: AnalyticsQuery):
+    try:
+        data = get_full_analytics(days=request.days, user_id=DEV_USER_ID)
         return {
             "success": True,
-            **data,
+            "message": "Analytics refreshed from the database.",
+            "period_days": request.days,
+            "results": [],
+            "overview": data["overview"],
         }
-
     except Exception as exc:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Failed to load analytics: "
-                f"{str(exc)}"
-            ),
-        )
-
-
-@router.get(
-    "/overview"
-)
-def analytics_overview():
-
-    try:
-
-        return {
-            "success": True,
-            **get_overview(
-                DEV_USER_ID
-            ),
-        }
-
-    except Exception as exc:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Failed to load overview: "
-                f"{str(exc)}"
-            ),
-        )
-
-
-@router.get(
-    "/platforms"
-)
-def analytics_platforms():
-
-    try:
-
-        platforms = (
-            get_platform_analytics(
-                DEV_USER_ID
-            )
-        )
-
-        return {
-            "success": True,
-            "count": len(platforms),
-            "platforms": platforms,
-        }
-
-    except Exception as exc:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Failed to load platform "
-                f"analytics: {str(exc)}"
-            ),
-        )
-
-
-@router.get(
-    "/daily"
-)
-def analytics_daily(
-    start_date: date | None = Query(
-        default=None
-    ),
-    end_date: date | None = Query(
-        default=None
-    ),
-):
-
-    if (
-        start_date
-        and end_date
-        and start_date > end_date
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "start_date cannot be "
-                "after end_date."
-            ),
-        )
-
-    try:
-
-        daily = get_daily_analytics(
-            user_id=DEV_USER_ID,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-        return {
-            "success": True,
-            "count": len(daily),
-            "daily": daily,
-        }
-
-    except Exception as exc:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Failed to load daily "
-                f"analytics: {str(exc)}"
-            ),
-        )
+        raise HTTPException(status_code=500, detail=f"Analytics refresh failed: {exc}")

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import {
   Check,
   Clipboard,
@@ -17,11 +19,42 @@ function AiPreview({
   onSaveDraft,
   onSchedule,
   loading,
+  saving,
 }) {
   const displayHashtags =
     hashtags.length > 0
       ? hashtags
       : extractHashtags(content);
+
+  // -----------------------------------------------
+  // NEW: track whether the imageUrl we were given
+  // actually loads. A URL can be present but still
+  // fail (private/expired Supabase Storage link,
+  // CORS block, 404, etc.), in which case the
+  // browser shows a broken-image icon instead of
+  // our placeholder. This resets whenever a new
+  // imageUrl comes in and swaps to the placeholder
+  // if loading fails.
+  // -----------------------------------------------
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+
+    if (imageUrl) {
+      console.log(
+        "[AiPreview] received imageUrl:",
+        imageUrl
+      );
+    } else {
+      console.log(
+        "[AiPreview] no imageUrl in AI response for this post."
+      );
+    }
+  }, [imageUrl]);
+
+  const showImage =
+    Boolean(imageUrl) && !imageFailed;
 
   return (
     <div className="create-card preview-card">
@@ -78,12 +111,23 @@ function AiPreview({
         <div className="preview-body">
 
           {/* IMAGE */}
-          {imageUrl && (
+          {showImage ? (
             <div className="generated-image">
 
               <img
                 src={imageUrl}
                 alt="AI generated post"
+                onError={() => {
+                  // The URL was present but the
+                  // browser could not actually load
+                  // it (expired/private Supabase
+                  // Storage link, CORS, 404, etc.)
+                  console.error(
+                    "[AiPreview] image failed to load:",
+                    imageUrl
+                  );
+                  setImageFailed(true);
+                }}
               />
 
               <div className="image-label">
@@ -91,6 +135,26 @@ function AiPreview({
                 AI generated media
               </div>
 
+            </div>
+          ) : (
+            /*
+              Shown when:
+              - the AI backend did not return an image
+                at all (n8n workflow has no image
+                generation step / test webhook only
+                fires once), OR
+              - an imageUrl was returned but failed to
+                actually load (see onError above).
+              Check the browser console for which case
+              this is.
+            */
+            <div className="generated-image generated-image-empty">
+              <Image size={22} />
+              <span>
+                {imageUrl
+                  ? "An image URL was returned, but the image failed to load. Check the browser console for details."
+                  : "No image was returned for this post."}
+              </span>
             </div>
           )}
 
@@ -183,14 +247,16 @@ function AiPreview({
             <button
               className="preview-action save"
               onClick={onSaveDraft}
+              disabled={saving}
             >
               <Check size={16} />
-              Save Draft
+              {saving ? "Saving..." : "Save Draft"}
             </button>
 
             <button
               className="preview-action schedule"
               onClick={onSchedule}
+              disabled={saving}
             >
               <Sparkles size={16} />
               Schedule Post

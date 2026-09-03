@@ -583,6 +583,27 @@
   background: rgba(125, 43, 51, 0.14);
 }
 
+.post-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.post-menu-divider {
+  height: 1px;
+  margin: 6px 4px;
+  background: #1e3a40;
+}
+
+.post-menu-label {
+  display: block;
+  padding: 2px 9px 4px;
+  color: #5f8286;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .post-platform {
   position: absolute;
   right: 12px;
@@ -964,6 +985,37 @@
   background: #69c4bd;
 }
 
+.modal-danger {
+  height: 41px;
+  padding: 0 15px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  border: 1px solid rgba(214, 103, 103, 0.22);
+  color: #e5a0a0;
+  background: rgba(111, 37, 44, 0.18);
+}
+
+.modal-danger:hover {
+  background: rgba(137, 45, 53, 0.28);
+}
+
+.modal-regenerate-wrap {
+  position: relative;
+}
+
+.modal-regenerate-menu {
+  top: auto;
+  bottom: 48px;
+  right: 0;
+  min-width: 200px;
+}
+
 .delete-modal {
   width: min(410px, 100%);
   padding: 28px;
@@ -1118,8 +1170,18 @@
   }
 
   .modal-secondary,
-  .modal-primary {
+  .modal-primary,
+  .modal-danger,
+  .modal-regenerate-wrap,
+  .modal-regenerate-wrap button {
     width: 100%;
+  }
+
+  .modal-regenerate-menu {
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
   }
 }
 
@@ -1138,5 +1200,162 @@
 
   .post-stat {
     min-height: 76px;
+  }
+}
+/* =====================================================
+   SCHEDULE POST MODAL
+   (same styling as the Create Post page's schedule
+   modal, reused here so scheduling an existing post
+   from the Posts page looks/feels identical)
+===================================================== */
+
+.schedule-post-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.schedule-post-modal {
+  width: 100%;
+  max-width: 420px;
+  background: #10151c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.schedule-post-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.schedule-post-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.schedule-post-header button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.schedule-post-hint {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.schedule-post-error {
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  color: #ff8080;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.schedule-post-modal input[type="datetime-local"] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 14px;
+}
+
+.schedule-post-field {
+  margin-bottom: 16px;
+}
+
+.schedule-post-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+
+.schedule-post-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 14px;
+  appearance: auto;
+}
+
+.schedule-post-field select option {
+  background: #10151c;
+  color: #fff;
+}
+
+.schedule-post-noaccounts {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.schedule-post-noaccounts a {
+  color: #2dd4bf;
+  text-decoration: underline;
+}
+
+.schedule-post-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.schedule-post-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.schedule-post-confirm {
+  background: linear-gradient(135deg, #2dd4bf, #22c55e);
+  border: none;
+  color: #06251c;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.schedule-post-confirm:disabled,
+.schedule-post-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .schedule-post-modal {
+    padding: 18px;
   }
 }

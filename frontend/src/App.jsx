@@ -18,7 +18,7 @@ import Login from "./pages/Auth/Login";
 import Signup from "./pages/Auth/Signup";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import ResetPassword from "./pages/Auth/ResetPassword";
-
+import TermsOfService from "./pages/TermsOfService/TermsOfService";
 // App Pages
 import Dashboard from "./pages/Dashboard/Dashboard";
 import CreatePost from "./pages/CreatePost/CreatePost";
@@ -87,7 +87,10 @@ function ProtectedApp() {
             path="/settings"
             element={<Settings />}
           />
-
+          <Route
+            path="/terms"
+            element={<TermsOfService />}
+          />
           {/* Unknown protected route */}
           <Route
             path="*"

@@ -11,6 +11,18 @@ async def get_platform_profile(
         platform
     )
 
+    if platform.lower() == "instagram":
+        return await adapter.get_profile(
+            access_token,
+            platform="instagram",
+        )
+
+    if platform.lower() == "facebook":
+        return await adapter.get_profile(
+            access_token,
+            platform="facebook",
+        )
+
     return await adapter.get_profile(
         access_token
     )

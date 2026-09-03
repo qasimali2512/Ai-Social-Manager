@@ -5,6 +5,7 @@ import {
   History,
   Home,
   LayoutTemplate,
+  LogOut,
   PenLine,
   Settings,
   Users,
@@ -12,7 +13,12 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { NavLink } from "react-router-dom";
+import {
+  NavLink,
+  useNavigate,
+} from "react-router-dom";
+
+import { useAuth } from "../../context/AuthContext";
 
 import "./Sidebar.css";
 
@@ -64,10 +70,69 @@ const menuItems = [
   },
 ];
 
+function getUserName(user) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "User"
+  );
+}
+
+function getInitials(name) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return (
+      parts[0][0] +
+      parts[parts.length - 1][0]
+    ).toUpperCase();
+  }
+
+  return name
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function Sidebar({
   mobileOpen,
   onClose,
 }) {
+  const navigate = useNavigate();
+
+  const {
+    user,
+    signOut,
+  } = useAuth();
+
+  const userName = getUserName(user);
+
+  const userEmail =
+    user?.email || "";
+
+  const initials =
+    getInitials(userName);
+
+  async function handleLogout() {
+    try {
+      await signOut();
+
+      onClose?.();
+
+      navigate("/login", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error(
+        "Logout failed:",
+        error
+      );
+    }
+  }
+
   return (
     <>
       {mobileOpen && (
@@ -84,14 +149,21 @@ function Sidebar({
             : ""
         }`}
       >
+        {/* BRAND */}
+
         <div className="sidebar-brand">
           <div className="brand-icon">
             <Sparkles size={23} />
           </div>
 
           <div>
-            <h2>AI Social Manager</h2>
-            <p>Automate. Create. Publish.</p>
+            <h2>
+              AI Social Manager
+            </h2>
+
+            <p>
+              Automate. Create. Publish.
+            </p>
           </div>
 
           <button
@@ -103,6 +175,8 @@ function Sidebar({
           </button>
         </div>
 
+        {/* NAVIGATION */}
+
         <nav className="sidebar-nav">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -112,47 +186,57 @@ function Sidebar({
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                end={item.path === "/dashboard"}
-                className={({ isActive }) =>
+                end={
+                  item.path ===
+                  "/dashboard"
+                }
+                className={({
+                  isActive,
+                }) =>
                   `sidebar-link ${
-                    isActive ? "active" : ""
+                    isActive
+                      ? "active"
+                      : ""
                   }`
                 }
               >
                 <Icon size={20} />
-                <span>{item.label}</span>
+
+                <span>
+                  {item.label}
+                </span>
               </NavLink>
             );
           })}
         </nav>
 
+        {/* USER AREA */}
+
         <div className="sidebar-bottom">
-          <div className="upgrade-card">
-            <div className="upgrade-icon">
-              🚀
-            </div>
-
-            <h3>Upgrade to Pro</h3>
-
-            <p>
-              Unlock premium features and
-              grow faster.
-            </p>
-
-            <button>
-              Upgrade Now
-            </button>
-          </div>
-
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">
-              QA
+              {initials}
             </div>
 
-            <div>
-              <strong>Qasim Ali</strong>
-              <span>Admin</span>
+            <div className="sidebar-user-info">
+              <strong>
+                {userName}
+              </strong>
+
+              <span>
+                {userEmail}
+              </span>
             </div>
+
+            <button
+              type="button"
+              className="sidebar-logout"
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout"
+            >
+              <LogOut size={17} />
+            </button>
           </div>
         </div>
       </aside>

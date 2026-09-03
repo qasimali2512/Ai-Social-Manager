@@ -20,6 +20,29 @@ class GenerateContentRequest(BaseModel):
 
     length: str = "medium"
 
+    # -------------------------------------------------
+    # NEW: regeneration support
+    #
+    # mode:
+    #   "both"  -> generate + save new text AND image
+    #              (default, original behaviour)
+    #   "text"  -> only regenerate the caption/content,
+    #              existing image (if any) is kept
+    #   "image" -> only regenerate the image, existing
+    #              caption/content (if any) is kept
+    #
+    # post_id:
+    #   When provided, the existing post row is updated
+    #   in place instead of creating a brand new post.
+    #   Used by the "Posts" page's Regenerate dropdown
+    #   (Regenerate Image / Regenerate Text / Regenerate
+    #   Both) and the Delete flow.
+    # -------------------------------------------------
+
+    mode: str = "both"
+
+    post_id: str | None = None
+
 
 class GenerateContentResponse(BaseModel):
     success: bool

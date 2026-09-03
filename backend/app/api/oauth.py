@@ -1,8 +1,14 @@
+import logging
+from urllib.parse import urlencode
+
 from fastapi import (
     APIRouter,
     HTTPException,
     Query,
 )
+from fastapi.responses import RedirectResponse
+
+from app.core.config import settings
 
 from app.services.oauth_service import (
     build_authorization_url,
@@ -11,6 +17,8 @@ from app.services.oauth_service import (
 from app.services.oauth_state_service import (
     create_state,
     validate_state,
+    create_code_verifier,
+    create_code_challenge,
 )
 
 from app.services.oauth_token_service import (
@@ -32,12 +40,70 @@ router = APIRouter(
 )
 
 
-DEV_USER_ID = (
-    "00000000-0000-0000-0000-000000000001"
-)
+logger = logging.getLogger("oauth")
 
-FRONTEND_URL = "http://localhost:5173"
-BACKEND_URL = "http://localhost:8000"
+
+# ============================================
+# REDIRECT HELPERS
+# ============================================
+#
+# IMPORTANT: error/status messages are put through
+# urlencode() before being appended to the redirect
+# URL. Providers (LinkedIn, Meta, X) can return error
+# text containing spaces, "&", ":" etc. Without
+# encoding, that text corrupts the query string and
+# the frontend can silently fail to parse "oauth" /
+# "message", which looks like "nothing happens" after
+# the redirect even though the backend did try to
+# report an error.
+
+def _redirect(params: dict) -> RedirectResponse:
+    query = urlencode(params)
+
+    return RedirectResponse(
+        url=(
+            f"{settings.FRONTEND_URL}"
+            f"/accounts?{query}"
+        )
+    )
+
+
+def _error_redirect(
+    message: str,
+    platform: str | None = None,
+) -> RedirectResponse:
+    # Log to the server console so the real
+    # failure reason is visible in the uvicorn
+    # output, not just buried in a redirect URL
+    # that the frontend strips right away.
+    logger.warning(
+        f"OAuth failed for platform="
+        f"'{platform}': {message}"
+    )
+
+    params = {
+        "oauth": "error",
+        "message": message,
+    }
+
+    if platform:
+        params["platform"] = platform
+
+    return _redirect(params)
+
+
+def _success_redirect(
+    platform: str,
+) -> RedirectResponse:
+    logger.warning(
+        f"OAuth succeeded for platform="
+        f"'{platform}'"
+    )
+
+    return _redirect({
+        "oauth": "success",
+        "platform": platform,
+    })
 
 
 # ============================================
@@ -48,15 +114,66 @@ BACKEND_URL = "http://localhost:8000"
 def connect_platform(
     platform: str,
 ):
-    platform = platform.lower().strip()
+    platform = (
+        platform
+        .lower()
+        .strip()
+    )
+
+    supported = {
+        "linkedin",
+        "facebook",
+        "instagram",
+        "x",
+        "twitter",
+        "tiktok",
+        "youtube",
+    }
+
+    if platform not in supported:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unsupported OAuth platform."
+            ),
+        )
+
+    # Temporary development user.
+    # Later this should come from the
+    # authenticated Supabase user.
+    user_id = settings.DEMO_USER_ID
+
+    code_verifier = None
+    code_challenge = None
+
+    # X and TikTok both require PKCE on their OAuth 2.0
+    # authorize step. TikTok's own error ("code_challenge"
+    # missing) confirms this - it was only being generated
+    # for X before.
+    if platform in {
+        "x",
+        "twitter",
+        "tiktok",
+    }:
+        code_verifier = (
+            create_code_verifier()
+        )
+
+        code_challenge = (
+            create_code_challenge(
+                code_verifier
+            )
+        )
 
     state = create_state(
-        user_id=DEV_USER_ID,
+        user_id=user_id,
         platform=platform,
+        code_verifier=code_verifier,
     )
 
     redirect_uri = (
-        f"{BACKEND_URL}/api/oauth/"
+        f"{settings.BACKEND_URL}"
+        f"/api/oauth/"
         f"{platform}/callback"
     )
 
@@ -66,6 +183,7 @@ def connect_platform(
                 platform_key=platform,
                 redirect_uri=redirect_uri,
                 state=state,
+                code_challenge=code_challenge,
             )
         )
 
@@ -75,15 +193,21 @@ def connect_platform(
             detail=str(exc),
         )
 
+    logger.warning(
+        f"OAuth authorize URL for "
+        f"'{platform}': {authorization_url}"
+    )
+
     return {
         "success": True,
         "platform": platform,
-        "authorization_url": authorization_url,
+        "authorization_url":
+            authorization_url,
     }
 
 
 # ============================================
-# OAUTH CALLBACK
+# CALLBACK
 # ============================================
 
 @router.get("/{platform}/callback")
@@ -92,29 +216,35 @@ async def oauth_callback(
     code: str | None = Query(None),
     state: str | None = Query(None),
     error: str | None = Query(None),
+    error_description: str | None = Query(None),
 ):
-    platform = platform.lower().strip()
+
+    platform = (
+        platform
+        .lower()
+        .strip()
+    )
 
     # ----------------------------------------
-    # Provider returned an error
+    # Provider error
     # ----------------------------------------
 
     if error:
-        raise HTTPException(
-            status_code=400,
-            detail=f"OAuth authorization failed: {error}",
+        return _error_redirect(
+            error_description or error,
+            platform=platform,
         )
 
     if not code:
-        raise HTTPException(
-            status_code=400,
-            detail="Authorization code is missing",
+        return _error_redirect(
+            "missing_code",
+            platform=platform,
         )
 
     if not state:
-        raise HTTPException(
-            status_code=400,
-            detail="OAuth state is missing",
+        return _error_redirect(
+            "missing_state",
+            platform=platform,
         )
 
     # ----------------------------------------
@@ -127,39 +257,49 @@ async def oauth_callback(
     )
 
     if not state_data:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or expired OAuth state",
+        return _error_redirect(
+            "invalid_state",
+            platform=platform,
         )
 
-    user_id = state_data["user_id"]
+    user_id = state_data[
+        "user_id"
+    ]
+
+    code_verifier = state_data.get(
+        "code_verifier"
+    )
 
     # ----------------------------------------
-    # Redirect URI must match connect URL
+    # Redirect URI
     # ----------------------------------------
 
     redirect_uri = (
-        f"{BACKEND_URL}/api/oauth/"
+        f"{settings.BACKEND_URL}"
+        f"/api/oauth/"
         f"{platform}/callback"
     )
 
     # ----------------------------------------
-    # Exchange code → access token
+    # Exchange code
     # ----------------------------------------
 
     try:
+
         token_data = (
             await exchange_code_for_token(
                 platform_key=platform,
                 code=code,
                 redirect_uri=redirect_uri,
+                code_verifier=code_verifier,
             )
         )
 
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
+    except Exception as exc:
+
+        return _error_redirect(
+            str(exc),
+            platform=platform,
         )
 
     access_token = token_data.get(
@@ -167,12 +307,9 @@ async def oauth_callback(
     )
 
     if not access_token:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Provider did not return "
-                "an access token."
-            ),
+        return _error_redirect(
+            "no_access_token",
+            platform=platform,
         )
 
     # ----------------------------------------
@@ -180,6 +317,7 @@ async def oauth_callback(
     # ----------------------------------------
 
     try:
+
         profile = (
             await get_platform_profile(
                 platform=platform,
@@ -187,17 +325,19 @@ async def oauth_callback(
             )
         )
 
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
+    except Exception as exc:
+
+        return _error_redirect(
+            str(exc),
+            platform=platform,
         )
 
     # ----------------------------------------
-    # Save / update connected account
+    # Save account
     # ----------------------------------------
 
     try:
+
         account = save_oauth_account(
             user_id=user_id,
             platform=platform,
@@ -205,41 +345,21 @@ async def oauth_callback(
             profile=profile,
         )
 
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
+    except Exception as exc:
+
+        return _error_redirect(
+            str(exc),
+            platform=platform,
         )
 
     if not account:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Failed to save social account."
-            ),
+        return _error_redirect(
+            "save_failed",
+            platform=platform,
         )
 
     # ----------------------------------------
-    # Don't return access token to frontend
+    # NEVER send tokens to frontend
     # ----------------------------------------
 
-    safe_account = {
-        key: value
-        for key, value in account.items()
-        if key not in {
-            "access_token",
-            "refresh_token",
-        }
-    }
-
-    return {
-        "success": True,
-        "platform": platform,
-        "message": (
-            "Social account connected successfully."
-        ),
-        "account": safe_account,
-        "redirect_url": (
-            f"{FRONTEND_URL}/accounts"
-        ),
-    }
+    return _success_redirect(platform)

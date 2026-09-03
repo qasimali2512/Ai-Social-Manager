@@ -1,6 +1,7 @@
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Copy,
   Edit3,
@@ -8,12 +9,15 @@ import {
   FileText,
   Filter,
   Globe2,
+  Image as ImageIcon,
   MoreHorizontal,
   Plus,
   RefreshCw,
   Search,
   Sparkles,
   Trash2,
+  Type as TypeIcon,
+  Wand2,
   X,
   AlertCircle,
 } from "lucide-react";
@@ -284,9 +288,128 @@ function Posts() {
   const [deletePostId, setDeletePostId] =
     useState(null);
 
+  // -----------------------------------------------
+  // NEW: AI regenerate (text / image / both) state.
+  //
+  // regeneratingKey looks like "<postId>:<mode>" so
+  // we can disable/label just the button that's
+  // actually busy, on both the card menu and the
+  // View modal.
+  // -----------------------------------------------
+  const [regeneratingKey, setRegeneratingKey] =
+    useState(null);
+
+  const [modalMenuOpen, setModalMenuOpen] =
+    useState(false);
+
+  // -----------------------------------------------
+  // NEW: Schedule Post (same flow as the Create Post
+  // page's "Schedule Post" button/modal), reused here
+  // so an existing post can be scheduled straight from
+  // the View modal / card menu.
+  // -----------------------------------------------
+  const [accounts, setAccounts] = useState([]);
+  const [platforms, setPlatforms] = useState([]);
+
+  const [schedulingPost, setSchedulingPost] =
+    useState(null);
+
+  const [showScheduleModal, setShowScheduleModal] =
+    useState(false);
+
+  const [scheduleValue, setScheduleValue] =
+    useState("");
+
+  const [selectedAccountId, setSelectedAccountId] =
+    useState("");
+
+  const [scheduling, setScheduling] =
+    useState(false);
+
+  const [scheduleError, setScheduleError] =
+    useState("");
+
   useEffect(() => {
     loadPosts();
+    loadAccounts();
+    loadPlatforms();
   }, []);
+
+  async function loadAccounts() {
+    try {
+      const data = await apiRequest(
+        "/api/social-accounts"
+      );
+
+      setAccounts(
+        Array.isArray(data)
+          ? data
+          : data?.accounts ||
+              data?.data ||
+              []
+      );
+    } catch {
+      setAccounts([]);
+    }
+  }
+
+  async function loadPlatforms() {
+    try {
+      const data = await apiRequest(
+        "/api/platforms"
+      );
+
+      setPlatforms(
+        Array.isArray(data)
+          ? data
+          : data?.platforms ||
+              data?.data ||
+              []
+      );
+    } catch {
+      setPlatforms([]);
+    }
+  }
+
+  // Connected accounts enriched with their platform's
+  // display name, for the schedule modal dropdown.
+  const connectedAccounts = useMemo(() => {
+    return (accounts || [])
+      .filter(
+        (account) =>
+          account?.is_active !== false
+      )
+      .map((account) => {
+        const matchedPlatform = (
+          platforms || []
+        ).find(
+          (item) =>
+            item?.id ===
+            account?.platform_id
+        );
+
+        const platformName =
+          matchedPlatform?.name ||
+          matchedPlatform?.label ||
+          matchedPlatform?.key ||
+          account?.platform ||
+          "Platform";
+
+        const handle =
+          account?.display_name ||
+          account?.username ||
+          "";
+
+        return {
+          id: account?.id,
+          platformId: account?.platform_id,
+          label: handle
+            ? `${platformName} — @${handle}`
+            : platformName,
+        };
+      })
+      .filter((account) => account.id);
+  }, [accounts, platforms]);
 
   async function loadPosts(showRefresh = false) {
     if (showRefresh) {
@@ -435,6 +558,237 @@ function Posts() {
         err.message ||
           "Could not delete post."
       );
+    }
+  }
+
+  // -----------------------------------------------
+  // REGENERATE WITH AI
+  //
+  // mode: "text"  -> regenerate caption only, keep image
+  //       "image" -> regenerate image only, keep caption
+  //       "both"  -> replace both (regenerate + replace)
+  // -----------------------------------------------
+  async function handleRegenerate(post, mode) {
+    if (!post?.id) return;
+
+    const key = `${post.id}:${mode}`;
+
+    setRegeneratingKey(key);
+    setError("");
+
+    try {
+      const topicSeed =
+        post?.topic ||
+        post?.title ||
+        getPostContent(post)
+          .slice(0, 80)
+          .trim() ||
+        "Untitled post";
+
+      const data = await apiRequest(
+        "/api/ai/generate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            topic: topicSeed,
+            platform:
+              getPlatform(post) || null,
+            mode,
+            post_id: post.id,
+          }),
+        }
+      );
+
+      const updatedPost = data?.post || null;
+
+      if (updatedPost) {
+        setPosts((current) =>
+          current.map((item) =>
+            String(item.id) ===
+            String(post.id)
+              ? {
+                  ...item,
+                  ...updatedPost,
+                }
+              : item
+          )
+        );
+
+        setSelectedPost((current) =>
+          current &&
+          String(current.id) ===
+            String(post.id)
+            ? {
+                ...current,
+                ...updatedPost,
+              }
+            : current
+        );
+      }
+
+      setMenuPost(null);
+      setModalMenuOpen(false);
+
+      const label =
+        mode === "text"
+          ? "Text regenerated successfully."
+          : mode === "image"
+          ? "Image regenerated successfully."
+          : "Post regenerated successfully.";
+
+      setSuccess(label);
+    } catch (err) {
+      setError(
+        err.message ||
+          "Could not regenerate post."
+      );
+    } finally {
+      setRegeneratingKey(null);
+    }
+  }
+
+  // -----------------------------------------------
+  // SCHEDULE POST (same flow as Create Post page)
+  // -----------------------------------------------
+
+  function handleSchedule(post) {
+    if (!post?.id) return;
+
+    setScheduleError("");
+    setSchedulingPost(post);
+
+    // default to "1 hour from now", or keep the
+    // post's existing scheduled time if it has one
+    const existing = post?.scheduled_at
+      ? new Date(post.scheduled_at)
+      : new Date(Date.now() + 60 * 60 * 1000);
+
+    const offset = existing.getTimezoneOffset();
+
+    const local = new Date(
+      existing.getTime() - offset * 60 * 1000
+    );
+
+    setScheduleValue(
+      local.toISOString().slice(0, 16)
+    );
+
+    // pre-select first connected account, if any
+    setSelectedAccountId(
+      connectedAccounts[0]?.id || ""
+    );
+
+    setMenuPost(null);
+    setModalMenuOpen(false);
+    setShowScheduleModal(true);
+  }
+
+  async function handleConfirmSchedule() {
+    if (!schedulingPost?.id || !scheduleValue) {
+      return;
+    }
+
+    setScheduling(true);
+    setScheduleError("");
+
+    try {
+      const scheduledIso = new Date(
+        scheduleValue
+      ).toISOString();
+
+      // 1) Mark the post itself as scheduled.
+      const data = await apiRequest(
+        `/api/posts/${schedulingPost.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            status: "scheduled",
+            scheduled_at: scheduledIso,
+          }),
+        }
+      );
+
+      const updatedPost =
+        data?.post || null;
+
+      // 2) If the user picked a connected account,
+      // attach the post to that platform/account so
+      // it actually knows WHERE to publish.
+      const chosenAccount =
+        connectedAccounts.find(
+          (account) =>
+            account.id ===
+            selectedAccountId
+        );
+
+      if (chosenAccount) {
+        try {
+          await apiRequest(
+            `/api/posts/${schedulingPost.id}/publications`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                platform_id:
+                  chosenAccount.platformId,
+                social_account_id:
+                  chosenAccount.id,
+                scheduled_at: scheduledIso,
+              }),
+            }
+          );
+        } catch (pubErr) {
+          // A 409 just means this post/platform
+          // pair was already linked - not a real
+          // failure, so ignore it. Anything else,
+          // surface it but keep the schedule set.
+          if (
+            !String(
+              pubErr?.message || ""
+            ).includes("already")
+          ) {
+            throw pubErr;
+          }
+        }
+      }
+
+      if (updatedPost) {
+        setPosts((current) =>
+          current.map((item) =>
+            String(item.id) ===
+            String(schedulingPost.id)
+              ? {
+                  ...item,
+                  ...updatedPost,
+                }
+              : item
+          )
+        );
+
+        setSelectedPost((current) =>
+          current &&
+          String(current.id) ===
+            String(schedulingPost.id)
+            ? {
+                ...current,
+                ...updatedPost,
+              }
+            : current
+        );
+      }
+
+      setShowScheduleModal(false);
+      setSchedulingPost(null);
+
+      setSuccess(
+        "Post scheduled successfully."
+      );
+    } catch (err) {
+      setScheduleError(
+        err?.message ||
+          "Failed to schedule post."
+      );
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -916,6 +1270,90 @@ function Posts() {
                           </button>
 
                           <button
+                            onClick={() =>
+                              handleSchedule(
+                                post
+                              )
+                            }
+                          >
+                            <Sparkles
+                              size={15}
+                            />
+                            Schedule Post
+                          </button>
+
+                          <div className="post-menu-divider" />
+
+                          <span className="post-menu-label">
+                            Regenerate with AI
+                          </span>
+
+                          <button
+                            onClick={() =>
+                              handleRegenerate(
+                                post,
+                                "text"
+                              )
+                            }
+                            disabled={
+                              regeneratingKey ===
+                              `${post.id}:text`
+                            }
+                          >
+                            <TypeIcon
+                              size={15}
+                            />
+                            {regeneratingKey ===
+                            `${post.id}:text`
+                              ? "Regenerating…"
+                              : "Regenerate Text"}
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleRegenerate(
+                                post,
+                                "image"
+                              )
+                            }
+                            disabled={
+                              regeneratingKey ===
+                              `${post.id}:image`
+                            }
+                          >
+                            <ImageIcon
+                              size={15}
+                            />
+                            {regeneratingKey ===
+                            `${post.id}:image`
+                              ? "Regenerating…"
+                              : "Regenerate Image"}
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleRegenerate(
+                                post,
+                                "both"
+                              )
+                            }
+                            disabled={
+                              regeneratingKey ===
+                              `${post.id}:both`
+                            }
+                          >
+                            <Wand2
+                              size={15}
+                            />
+                            {regeneratingKey ===
+                            `${post.id}:both`
+                              ? "Regenerating…"
+                              : "Regenerate Both"}
+                          </button>
+
+                          <div className="post-menu-divider" />
+
+                          <button
                             className="danger"
                             onClick={() =>
                               setDeletePostId(
@@ -975,11 +1413,14 @@ function Posts() {
 
                       <button
                         className="post-view-button"
-                        onClick={() =>
+                        onClick={() => {
+                          setModalMenuOpen(
+                            false
+                          );
                           setSelectedPost(
                             post
-                          )
-                        }
+                          );
+                        }}
                       >
                         View
                         <ExternalLink
@@ -998,9 +1439,10 @@ function Posts() {
       {selectedPost && (
         <div
           className="post-modal-backdrop"
-          onClick={() =>
-            setSelectedPost(null)
-          }
+          onClick={() => {
+            setSelectedPost(null);
+            setModalMenuOpen(false);
+          }}
         >
           <div
             className="post-modal"
@@ -1022,9 +1464,10 @@ function Posts() {
               </div>
 
               <button
-                onClick={() =>
-                  setSelectedPost(null)
-                }
+                onClick={() => {
+                  setSelectedPost(null);
+                  setModalMenuOpen(false);
+                }}
               >
                 <X size={19} />
               </button>
@@ -1117,10 +1560,121 @@ function Posts() {
                 Copy Caption
               </button>
 
+              <div className="modal-regenerate-wrap">
+                <button
+                  className="modal-secondary"
+                  onClick={() =>
+                    setModalMenuOpen(
+                      (open) => !open
+                    )
+                  }
+                >
+                  <Wand2 size={16} />
+                  Regenerate
+                  <ChevronDown
+                    size={14}
+                  />
+                </button>
+
+                {modalMenuOpen && (
+                  <div className="post-menu modal-regenerate-menu">
+                    <button
+                      onClick={() =>
+                        handleRegenerate(
+                          selectedPost,
+                          "text"
+                        )
+                      }
+                      disabled={
+                        regeneratingKey ===
+                        `${selectedPost.id}:text`
+                      }
+                    >
+                      <TypeIcon
+                        size={15}
+                      />
+                      {regeneratingKey ===
+                      `${selectedPost.id}:text`
+                        ? "Regenerating…"
+                        : "Regenerate Text"}
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleRegenerate(
+                          selectedPost,
+                          "image"
+                        )
+                      }
+                      disabled={
+                        regeneratingKey ===
+                        `${selectedPost.id}:image`
+                      }
+                    >
+                      <ImageIcon
+                        size={15}
+                      />
+                      {regeneratingKey ===
+                      `${selectedPost.id}:image`
+                        ? "Regenerating…"
+                        : "Regenerate Image"}
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleRegenerate(
+                          selectedPost,
+                          "both"
+                        )
+                      }
+                      disabled={
+                        regeneratingKey ===
+                        `${selectedPost.id}:both`
+                      }
+                    >
+                      <RefreshCw
+                        size={15}
+                      />
+                      {regeneratingKey ===
+                      `${selectedPost.id}:both`
+                        ? "Regenerating…"
+                        : "Regenerate Both (Replace)"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                className="modal-secondary"
+                onClick={() =>
+                  handleSchedule(
+                    selectedPost
+                  )
+                }
+              >
+                <Sparkles size={16} />
+                Schedule Post
+              </button>
+
+              <button
+                className="modal-danger"
+                onClick={() => {
+                  const id =
+                    selectedPost.id;
+                  setSelectedPost(null);
+                  setModalMenuOpen(false);
+                  setDeletePostId(id);
+                }}
+              >
+                <Trash2 size={16} />
+                Delete
+              </button>
+
               <button
                 className="modal-primary"
                 onClick={() => {
                   setSelectedPost(null);
+                  setModalMenuOpen(false);
                   openEdit(
                     selectedPost
                   );
@@ -1175,6 +1729,134 @@ function Posts() {
               >
                 <Trash2 size={16} />
                 Delete Post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SCHEDULE MODAL (same flow as Create Post page) */}
+      {showScheduleModal && (
+        <div
+          className="schedule-post-backdrop"
+          onClick={() =>
+            !scheduling &&
+            setShowScheduleModal(false)
+          }
+        >
+          <div
+            className="schedule-post-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="schedule-post-header">
+              <h2>Schedule this post</h2>
+              <button
+                onClick={() =>
+                  setShowScheduleModal(false)
+                }
+                disabled={scheduling}
+                aria-label="Close"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <p className="schedule-post-hint">
+              Choose the connected account it should
+              publish to, and when.
+            </p>
+
+            {scheduleError && (
+              <div className="schedule-post-error">
+                {scheduleError}
+              </div>
+            )}
+
+            <div className="schedule-post-field">
+              <label>Publish to account</label>
+
+              {connectedAccounts.length > 0 ? (
+                <select
+                  value={selectedAccountId}
+                  onChange={(event) =>
+                    setSelectedAccountId(
+                      event.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    No specific account (just mark as
+                    scheduled)
+                  </option>
+
+                  {connectedAccounts.map(
+                    (account) => (
+                      <option
+                        key={account.id}
+                        value={account.id}
+                      >
+                        {account.label}
+                      </option>
+                    )
+                  )}
+                </select>
+              ) : (
+                <div className="schedule-post-noaccounts">
+                  No connected accounts found. Connect
+                  one from the{" "}
+                  <a href="/accounts">
+                    Accounts
+                  </a>{" "}
+                  page first, or continue without
+                  picking one.
+                </div>
+              )}
+            </div>
+
+            <div className="schedule-post-field">
+              <label>Publication date & time</label>
+
+              <input
+                type="datetime-local"
+                value={scheduleValue}
+                onChange={(event) =>
+                  setScheduleValue(
+                    event.target.value
+                  )
+                }
+                min={new Date(
+                  Date.now() -
+                    new Date().getTimezoneOffset() *
+                      60000
+                )
+                  .toISOString()
+                  .slice(0, 16)}
+              />
+            </div>
+
+            <div className="schedule-post-actions">
+              <button
+                className="schedule-post-cancel"
+                onClick={() =>
+                  setShowScheduleModal(false)
+                }
+                disabled={scheduling}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="schedule-post-confirm"
+                onClick={handleConfirmSchedule}
+                disabled={
+                  scheduling || !scheduleValue
+                }
+              >
+                {scheduling
+                  ? "Scheduling..."
+                  : "Confirm Schedule"}
               </button>
             </div>
           </div>

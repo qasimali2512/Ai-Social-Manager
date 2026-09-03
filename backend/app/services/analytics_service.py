@@ -1,466 +1,178 @@
-from collections import defaultdict
-from datetime import date, datetime, timedelta
+from __future__ import annotations
 
-from app.db.supabase import supabase
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict
+
+from app.db.supabase import safe_execute, supabase
+
+DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+METRIC_KEYS = (
+    "likes", "comments", "shares", "saves", "clicks",
+    "reach", "impressions", "video_views", "engagement",
+)
 
 
-VALID_STATUSES = {
-    "published",
-    "scheduled",
-    "pending",
-    "failed",
-    "publishing",
-}
+def _empty_metrics() -> Dict[str, Any]:
+    return {**{key: 0 for key in METRIC_KEYS}, "engagement_rate": 0.0}
 
 
-def _parse_date(value):
+def _number(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _date(value: Any):
     if not value:
         return None
-
-    if isinstance(value, date):
-        return value
-
     try:
-        return datetime.fromisoformat(
-            str(value).replace("Z", "+00:00")
-        ).date()
-    except (ValueError, TypeError):
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except (TypeError, ValueError):
         return None
 
 
-def _normalize_status(value):
-    status = str(value or "").lower().strip()
-
-    if status in VALID_STATUSES:
-        return status
-
-    return "pending"
+def _add_metrics(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    for key in METRIC_KEYS:
+        target[key] += _number(source.get(key))
 
 
-def _get_posts(user_id: str):
-    response = (
-        supabase
-        .table("posts")
-        .select(
-            "id,user_id,status,created_at"
+def _finalize_metrics(data: Dict[str, Any]) -> Dict[str, Any]:
+    data = {**_empty_metrics(), **data}
+    if not data["engagement"]:
+        data["engagement"] = (
+            data["likes"] + data["comments"] + data["shares"]
+            + data["saves"] + data["clicks"]
         )
-        .eq(
-            "user_id",
-            user_id,
+    if data["impressions"]:
+        data["engagement_rate"] = round(
+            data["engagement"] / data["impressions"] * 100, 2
         )
-        .execute()
+    return data
+
+
+def get_full_analytics(days: int = 30, user_id: str = DEV_USER_ID) -> Dict[str, Any]:
+    days = max(1, min(int(days or 30), 365))
+    start = datetime.now(timezone.utc) - timedelta(days=days)
+
+    posts_response = safe_execute(
+        supabase.table("posts")
+        .select("id,status,platform,created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
     )
+    posts = posts_response.data or []
 
-    return response.data or []
-
-
-def _get_publications(user_id: str):
-    response = (
-        supabase
-        .table("post_publications")
-        .select(
-            """
-            id,
-            post_id,
-            platform_id,
-            social_account_id,
-            scheduled_at,
-            published_at,
-            status,
-            error_message,
-            created_at,
-            posts!inner(
-                id,
-                user_id
-            ),
-            platforms(
-                id,
-                name,
-                slug
-            )
-            """
-        )
-        .eq(
-            "posts.user_id",
-            user_id,
-        )
-        .order(
-            "created_at",
-            desc=True,
-        )
-        .execute()
-    )
-
-    return response.data or []
-
-
-def get_analytics(
-    user_id: str,
-    start_date: date | None = None,
-    end_date: date | None = None,
-):
-    posts = _get_posts(user_id)
-    publications = _get_publications(user_id)
-
-    # --------------------------------------------------------
-    # Date filtering
-    # --------------------------------------------------------
-
-    if start_date or end_date:
-
-        filtered_publications = []
-
-        for publication in publications:
-
-            publication_date = (
-                _parse_date(
-                    publication.get(
-                        "created_at"
-                    )
-                )
-                or _parse_date(
-                    publication.get(
-                        "scheduled_at"
-                    )
-                )
-            )
-
-            if not publication_date:
-                continue
-
-            if (
-                start_date
-                and publication_date < start_date
-            ):
-                continue
-
-            if (
-                end_date
-                and publication_date > end_date
-            ):
-                continue
-
-            filtered_publications.append(
-                publication
-            )
-
-        publications = (
-            filtered_publications
-        )
-
-        post_ids = {
-            item.get("post_id")
-            for item in publications
-            if item.get("post_id")
-        }
-
-        posts = [
-            post
-            for post in posts
-            if post.get("id") in post_ids
-        ]
-
-    # --------------------------------------------------------
-    # Summary
-    # --------------------------------------------------------
-
-    summary = {
-        "total_posts": len(posts),
-        "published_posts": 0,
-        "scheduled_posts": 0,
-        "pending_posts": 0,
-        "failed_posts": 0,
-        "total_publications": len(
-            publications
-        ),
-        "successful_publications": 0,
-        "failed_publications": 0,
-    }
-
-    # Count post statuses
+    posts_in_period = []
     for post in posts:
+        created = _date(post.get("created_at"))
+        if created is None or created >= start:
+            posts_in_period.append(post)
 
-        status = _normalize_status(
-            post.get("status")
-        )
+    overview = _empty_metrics()
+    overview.update({"total_posts": len(posts_in_period), "published": 0, "scheduled": 0, "failed": 0, "draft": 0, "success_rate": 0.0})
 
-        if status == "published":
-            summary[
-                "published_posts"
-            ] += 1
+    post_platforms: Dict[str, int] = {}
+    daily_activity: Dict[str, int] = {}
+    post_ids = {post.get("id") for post in posts_in_period if post.get("id")}
 
-        elif status == "scheduled":
-            summary[
-                "scheduled_posts"
-            ] += 1
+    for post in posts_in_period:
+        status = str(post.get("status") or "draft").lower()
+        if status == "published": overview["published"] += 1
+        elif status == "scheduled": overview["scheduled"] += 1
+        elif status == "failed": overview["failed"] += 1
+        else: overview["draft"] += 1
 
-        elif status == "failed":
-            summary[
-                "failed_posts"
-            ] += 1
+        platform = str(post.get("platform") or "unknown").lower()
+        post_platforms[platform] = post_platforms.get(platform, 0) + 1
+        created = _date(post.get("created_at"))
+        if created:
+            key = created.strftime("%Y-%m-%d")
+            daily_activity[key] = daily_activity.get(key, 0) + 1
 
-        else:
-            summary[
-                "pending_posts"
-            ] += 1
+    completed = overview["published"] + overview["failed"]
+    if completed:
+        overview["success_rate"] = round(overview["published"] / completed * 100, 2)
 
-    # Count publication statuses
-    for publication in publications:
-
-        status = _normalize_status(
-            publication.get("status")
-        )
-
-        if status == "published":
-            summary[
-                "successful_publications"
-            ] += 1
-
-        elif status == "failed":
-            summary[
-                "failed_publications"
-            ] += 1
-
-    # --------------------------------------------------------
-    # Platform analytics
-    # --------------------------------------------------------
-
-    platform_data = defaultdict(
-        lambda: {
-            "platform_id": None,
-            "platform_name": "Unknown",
-            "platform_slug": None,
-            "total": 0,
-            "published": 0,
-            "scheduled": 0,
-            "pending": 0,
-            "failed": 0,
-        }
+    publications_response = safe_execute(
+        supabase.table("post_publications")
+        .select("id,post_id,platform_id,status,created_at,published_at,scheduled_at,platforms(id,name,slug,icon)")
+        .order("created_at", desc=True)
     )
+    publications = [
+        item for item in (publications_response.data or [])
+        if item.get("post_id") in post_ids
+    ]
 
-    for publication in publications:
+    # Publication records are the source of truth for platform activity.
+    platform_data: Dict[str, Dict[str, Any]] = {}
+    for item in publications:
+        platform = item.get("platforms") or {}
+        key = str(platform.get("slug") or platform.get("name") or "unknown").lower()
+        bucket = platform_data.setdefault(key, {"posts": 0, "published": 0, "scheduled": 0, "failed": 0, **_empty_metrics()})
+        bucket["posts"] += 1
+        status = str(item.get("status") or "").lower()
+        if status == "published": bucket["published"] += 1
+        elif status in {"scheduled", "pending"}: bucket["scheduled"] += 1
+        elif status == "failed": bucket["failed"] += 1
 
-        platform = (
-            publication.get(
-                "platforms"
-            )
-            or {}
+    # Optional real metrics table. If it is not installed yet, analytics still works.
+    try:
+        metric_response = safe_execute(
+            supabase.table("social_post_metrics")
+            .select("post_id,platform,likes,comments,shares,saves,clicks,reach,impressions,video_views,engagement,engagement_rate,created_at")
+            .eq("user_id", user_id)
         )
+        metric_rows = metric_response.data or []
+    except Exception:
+        metric_rows = []
 
-        platform_id = (
-            publication.get(
-                "platform_id"
-            )
-            or platform.get("id")
-        )
-
-        key = str(
-            platform_id
-            or "unknown"
-        )
-
-        item = platform_data[key]
-
-        item["platform_id"] = (
-            platform_id
-        )
-
-        item["platform_name"] = (
-            platform.get("name")
-            or "Unknown"
-        )
-
-        item["platform_slug"] = (
-            platform.get("slug")
-        )
-
-        item["total"] += 1
-
-        status = _normalize_status(
-            publication.get("status")
-        )
-
-        if status == "published":
-            item["published"] += 1
-
-        elif status == "scheduled":
-            item["scheduled"] += 1
-
-        elif status == "failed":
-            item["failed"] += 1
-
-        else:
-            item["pending"] += 1
-
-    platforms = list(
-        platform_data.values()
-    )
-
-    platforms.sort(
-        key=lambda item: item["total"],
-        reverse=True,
-    )
-
-    # --------------------------------------------------------
-    # Daily analytics
-    # --------------------------------------------------------
-
-    daily_data = defaultdict(
-        lambda: {
-            "total": 0,
-            "published": 0,
-            "scheduled": 0,
-            "pending": 0,
-            "failed": 0,
-        }
-    )
-
-    for publication in publications:
-
-        publication_date = (
-            _parse_date(
-                publication.get(
-                    "created_at"
-                )
-            )
-            or _parse_date(
-                publication.get(
-                    "scheduled_at"
-                )
-            )
-        )
-
-        if not publication_date:
+    daily_metrics: Dict[str, Dict[str, Any]] = {}
+    for row in metric_rows:
+        row_date = _date(row.get("created_at"))
+        if row.get("post_id") not in post_ids or (row_date and row_date < start):
             continue
+        normalized = _empty_metrics()
+        for key in METRIC_KEYS:
+            normalized[key] = _number(row.get(key))
+        normalized = _finalize_metrics(normalized)
+        _add_metrics(overview, normalized)
 
-        key = publication_date.isoformat()
+        platform = str(row.get("platform") or "unknown").lower()
+        bucket = platform_data.setdefault(platform, {"posts": 0, "published": 0, "scheduled": 0, "failed": 0, **_empty_metrics()})
+        _add_metrics(bucket, normalized)
 
-        daily_data[key]["total"] += 1
+        if row_date:
+            key = row_date.strftime("%Y-%m-%d")
+            daily = daily_metrics.setdefault(key, _empty_metrics())
+            _add_metrics(daily, normalized)
 
-        status = _normalize_status(
-            publication.get("status")
-        )
-
-        if status == "published":
-            daily_data[key][
-                "published"
-            ] += 1
-
-        elif status == "scheduled":
-            daily_data[key][
-                "scheduled"
-            ] += 1
-
-        elif status == "failed":
-            daily_data[key][
-                "failed"
-            ] += 1
-
-        else:
-            daily_data[key][
-                "pending"
-            ] += 1
-
-    daily = []
-
-    for day, values in sorted(
-        daily_data.items()
-    ):
-        daily.append({
-            "date": day,
-            **values,
-        })
-
-    # --------------------------------------------------------
-    # Recent publications
-    # --------------------------------------------------------
-
-    recent_publications = []
-
-    for publication in publications[:10]:
-
-        platform = (
-            publication.get(
-                "platforms"
-            )
-            or {}
-        )
-
-        recent_publications.append({
-            "id": publication.get(
-                "id"
-            ),
-            "post_id": publication.get(
-                "post_id"
-            ),
-            "platform_id": (
-                publication.get(
-                    "platform_id"
-                )
-                or platform.get("id")
-            ),
-            "platform_name": platform.get(
-                "name"
-            ),
-            "platform_slug": platform.get(
-                "slug"
-            ),
-            "status": _normalize_status(
-                publication.get(
-                    "status"
-                )
-            ),
-            "scheduled_at": publication.get(
-                "scheduled_at"
-            ),
-            "published_at": publication.get(
-                "published_at"
-            ),
-            "created_at": publication.get(
-                "created_at"
-            ),
-            "error_message": publication.get(
-                "error_message"
-            ),
-        })
+    overview = _finalize_metrics(overview)
+    for key, bucket in platform_data.items():
+        platform_data[key] = _finalize_metrics(bucket)
 
     return {
-        "summary": summary,
-        "platforms": platforms,
-        "daily": daily,
-        "recent_publications": (
-            recent_publications
-        ),
+        "period_days": days,
+        "overview": overview,
+        "posts": {
+            "total": overview["total_posts"],
+            "published": overview["published"],
+            "scheduled": overview["scheduled"],
+            "failed": overview["failed"],
+            "draft": overview["draft"],
+        },
+        "platforms": platform_data,
+        "post_platforms": post_platforms,
+        "daily_activity": [
+            {"date": date, "posts": count}
+            for date, count in sorted(daily_activity.items())
+        ],
+        "daily_metrics": [
+            {"date": date, **_finalize_metrics(values)}
+            for date, values in sorted(daily_metrics.items())
+        ],
     }
-
-
-def get_overview(
-    user_id: str,
-):
-    return get_analytics(
-        user_id=user_id
-    )
-
-
-def get_platform_analytics(
-    user_id: str,
-):
-    analytics = get_analytics(
-        user_id=user_id
-    )
-
-    return analytics["platforms"]
-
-
-def get_daily_analytics(
-    user_id: str,
-    start_date: date | None = None,
-    end_date: date | None = None,
-):
-    analytics = get_analytics(
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-    return analytics["daily"]

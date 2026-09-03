@@ -1,39 +1,128 @@
 import httpx
 
-from app.services.platform_adapters.base import (
-    PlatformAdapter,
+
+GRAPH_API = (
+    "https://graph.facebook.com/v23.0"
 )
 
 
-GRAPH_API = "https://graph.facebook.com"
-
-
-class MetaAdapter(PlatformAdapter):
+class MetaAdapter:
 
     async def get_profile(
         self,
         access_token: str,
+        platform: str = "facebook",
     ) -> dict:
-        params = {
-            "fields": "id,name",
-            "access_token": access_token,
-        }
+
+        if platform == "instagram":
+
+            return await self._get_instagram_profile(
+                access_token
+            )
+
+        return await self._get_facebook_profile(
+            access_token
+        )
+
+    async def _get_facebook_profile(
+        self,
+        access_token: str,
+    ) -> dict:
 
         async with httpx.AsyncClient(
             timeout=30
         ) as client:
+
             response = await client.get(
                 f"{GRAPH_API}/me",
-                params=params,
+                params={
+                    "fields":
+                        "id,name",
+                    "access_token":
+                        access_token,
+                },
             )
 
         if response.status_code >= 400:
             raise ValueError(
-                f"Meta profile request failed: "
-                f"{response.text}"
+                "Facebook profile request "
+                f"failed: {response.text}"
             )
 
         return response.json()
+
+    async def _get_instagram_profile(
+        self,
+        access_token: str,
+    ) -> dict:
+
+        async with httpx.AsyncClient(
+            timeout=30
+        ) as client:
+
+            response = await client.get(
+                f"{GRAPH_API}/me/accounts",
+                params={
+                    "fields": (
+                        "id,name,"
+                        "instagram_business_account"
+                        "{id,username,name}"
+                    ),
+                    "access_token":
+                        access_token,
+                },
+            )
+
+        if response.status_code >= 400:
+            raise ValueError(
+                "Instagram account lookup "
+                f"failed: {response.text}"
+            )
+
+        data = response.json()
+
+        pages = data.get(
+            "data",
+            []
+        )
+
+        for page in pages:
+
+            instagram_account = page.get(
+                "instagram_business_account"
+            )
+
+            if instagram_account:
+                return {
+                    "id":
+                        instagram_account.get(
+                            "id"
+                        ),
+
+                    "name":
+                        instagram_account.get(
+                            "name"
+                        )
+                        or instagram_account.get(
+                            "username"
+                        ),
+
+                    "username":
+                        instagram_account.get(
+                            "username"
+                        ),
+
+                    "page_id":
+                        page.get("id"),
+                }
+
+        raise ValueError(
+            "No Instagram professional account "
+            "was found. Make sure your Instagram "
+            "account is a Business or Creator "
+            "account and is connected to a "
+            "Facebook Page."
+        )
 
     async def publish_post(
         self,
@@ -42,24 +131,12 @@ class MetaAdapter(PlatformAdapter):
         media_urls: list[str] | None = None,
     ) -> dict:
 
-        if not access_token:
-            return {
-                "success": False,
-                "error": "Access token is missing",
-            }
-
-        if not content:
-            return {
-                "success": False,
-                "error": "Post content is empty",
-            }
-
         return {
             "success": False,
             "status": "not_configured",
-            "platform": "meta",
             "message": (
-                "Publishing will be connected "
-                "after account setup."
+                "Meta publishing requires "
+                "the platform-specific publishing "
+                "flow."
             ),
         }

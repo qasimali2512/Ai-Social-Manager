@@ -1,5 +1,12 @@
+import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+import base64
+
+from datetime import (
+    datetime,
+    timedelta,
+    timezone,
+)
 
 
 _oauth_states: dict[str, dict] = {}
@@ -8,15 +15,41 @@ _oauth_states: dict[str, dict] = {}
 STATE_EXPIRY_MINUTES = 10
 
 
+def create_code_verifier() -> str:
+    return secrets.token_urlsafe(64)
+
+
+def create_code_challenge(
+    code_verifier: str,
+) -> str:
+
+    digest = hashlib.sha256(
+        code_verifier.encode("utf-8")
+    ).digest()
+
+    return (
+        base64.urlsafe_b64encode(
+            digest
+        )
+        .decode("utf-8")
+        .rstrip("=")
+    )
+
+
 def create_state(
     user_id: str,
     platform: str,
+    code_verifier: str | None = None,
 ) -> str:
+
     state = secrets.token_urlsafe(32)
 
     _oauth_states[state] = {
         "user_id": user_id,
-        "platform": platform.lower().strip(),
+        "platform": (
+            platform.lower().strip()
+        ),
+        "code_verifier": code_verifier,
         "created_at": datetime.now(
             timezone.utc
         ),
@@ -53,10 +86,17 @@ def validate_state(
     )
 
     if expired:
-        _oauth_states.pop(state, None)
+        _oauth_states.pop(
+            state,
+            None,
+        )
+
         return None
 
-    # OAuth state is one-time use.
-    _oauth_states.pop(state, None)
+    # One-time use.
+    _oauth_states.pop(
+        state,
+        None,
+    )
 
     return data

@@ -1,55 +1,155 @@
-from datetime import date
+from typing import Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class AnalyticsSummary(BaseModel):
+# ============================================================
+# SOCIAL METRICS
+# ============================================================
+
+class SocialMetrics(BaseModel):
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+    saves: int = 0
+    clicks: int = 0
+    reach: int = 0
+    impressions: int = 0
+    video_views: int = 0
+    engagement: int = 0
+    engagement_rate: float = 0.0
+
+
+# ============================================================
+# PLATFORM METRICS
+# ============================================================
+
+class PlatformMetrics(SocialMetrics):
+    platform: str = "unknown"
+
+
+# ============================================================
+# DAILY ACTIVITY
+# ============================================================
+
+class DailyActivity(BaseModel):
+    date: str
+    posts: int = 0
+
+
+# ============================================================
+# DAILY SOCIAL METRICS
+# ============================================================
+
+class DailySocialMetrics(SocialMetrics):
+    date: str
+
+
+# ============================================================
+# POSTS OVERVIEW
+# ============================================================
+
+class PostsOverview(BaseModel):
+    total: int = 0
+    published: int = 0
+    scheduled: int = 0
+    failed: int = 0
+    draft: int = 0
+
+
+# ============================================================
+# ANALYTICS OVERVIEW
+# ============================================================
+
+class AnalyticsOverview(SocialMetrics):
     total_posts: int = 0
-    published_posts: int = 0
-    scheduled_posts: int = 0
-    pending_posts: int = 0
-    failed_posts: int = 0
-    total_publications: int = 0
-    successful_publications: int = 0
-    failed_publications: int = 0
-
-
-class PlatformAnalytics(BaseModel):
-    platform_id: str | None = None
-    platform_name: str = "Unknown"
-    platform_slug: str | None = None
-    total: int = 0
     published: int = 0
     scheduled: int = 0
-    pending: int = 0
     failed: int = 0
+    draft: int = 0
+    success_rate: float = 0.0
 
 
-class DailyAnalytics(BaseModel):
-    date: date
-    total: int = 0
-    published: int = 0
-    scheduled: int = 0
-    pending: int = 0
-    failed: int = 0
-
-
-class RecentPublication(BaseModel):
-    id: str
-    post_id: str | None = None
-    platform_id: str | None = None
-    platform_name: str | None = None
-    platform_slug: str | None = None
-    status: str
-    scheduled_at: str | None = None
-    published_at: str | None = None
-    created_at: str | None = None
-    error_message: str | None = None
-
+# ============================================================
+# FULL ANALYTICS RESPONSE
+# ============================================================
 
 class AnalyticsResponse(BaseModel):
-    success: bool
-    summary: AnalyticsSummary
-    platforms: list[PlatformAnalytics]
-    daily: list[DailyAnalytics]
-    recent_publications: list[RecentPublication]
+    period_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+    )
+
+    overview: AnalyticsOverview
+
+    posts: PostsOverview
+
+    platforms: Dict[
+        str,
+        SocialMetrics,
+    ] = {}
+
+    post_platforms: Dict[
+        str,
+        int,
+    ] = {}
+
+    daily_activity: List[
+        DailyActivity
+    ] = []
+
+    daily_metrics: List[
+        DailySocialMetrics
+    ] = []
+
+
+# ============================================================
+# ANALYTICS QUERY
+# ============================================================
+
+class AnalyticsQuery(BaseModel):
+    days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+    )
+
+
+# ============================================================
+# METRIC SYNC REQUEST
+# ============================================================
+
+class MetricsSyncRequest(BaseModel):
+    platform: str | None = None
+    days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+    )
+
+
+# ============================================================
+# METRIC SYNC RESULT
+# ============================================================
+
+class MetricsSyncResult(BaseModel):
+    platform: str
+    synced: int = 0
+    updated: int = 0
+    failed: int = 0
+    message: str = ""
+
+
+# ============================================================
+# PLATFORM SYNC RESPONSE
+# ============================================================
+
+class AnalyticsSyncResponse(BaseModel):
+    success: bool = True
+
+    results: List[
+        MetricsSyncResult
+    ] = []
+
+    message: str = ""

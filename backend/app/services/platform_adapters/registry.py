@@ -1,44 +1,43 @@
-from app.services.platform_service import (
-    get_platform_by_key,
-)
-
 from .base import PlatformAdapter
 from .generic import GenericPlatformAdapter
+from .linkedin import LinkedInAdapter
+from .meta import MetaAdapter
+from .tiktok import TikTokAdapter
+from .x import XAdapter
+from .youtube import YouTubeAdapter
 
 
 def get_adapter(
     platform: str,
-) -> PlatformAdapter:
-
+):
     platform = (
-        platform.lower()
+        platform
+        .lower()
         .strip()
     )
 
-    config = get_platform_by_key(
-        platform
-    )
+    if platform == "linkedin":
+        return LinkedInAdapter()
 
-    if not config:
-        raise ValueError(
-            "Platform not found or inactive."
-        )
+    if platform in {
+        "facebook",
+        "instagram",
+    }:
+        return MetaAdapter()
 
-    api_base_url = config.get(
-        "api_base_url"
-    )
+    if platform in {
+        "x",
+        "twitter",
+    }:
+        return XAdapter()
 
-    if not api_base_url:
-        raise ValueError(
-            f"API base URL is not configured "
-            f"for {platform}."
-        )
+    if platform == "tiktok":
+        return TikTokAdapter()
 
-    # ----------------------------------------
-    # Platform-specific adapters can be added
-    # here later without changing the API.
-    # ----------------------------------------
+    if platform == "youtube":
+        return YouTubeAdapter()
 
-    return GenericPlatformAdapter(
-        api_base_url=api_base_url
+    raise ValueError(
+        f"Unsupported OAuth platform: "
+        f"{platform}"
     )

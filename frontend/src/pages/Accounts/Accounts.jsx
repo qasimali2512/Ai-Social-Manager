@@ -17,6 +17,8 @@ import {
 
 import { useEffect, useMemo, useState } from "react";
 
+import { supabase } from "../../lib/supabase";
+
 import "./Accounts.css";
 
 const API_URL =
@@ -53,6 +55,18 @@ const PLATFORM_CONFIG = {
     description:
       "Manage posts and publishing for your X account.",
   },
+
+  youtube: {
+    name: "YouTube",
+    description:
+      "Connect your YouTube channel and publish videos from one workspace.",
+  },
+
+  zernio: {
+    name: "Zapier / Zernio",
+    description:
+      "Use your Zernio connection to publish through Zapier-connected social accounts.",
+  },
 };
 
 const DEFAULT_PLATFORMS = [
@@ -75,6 +89,16 @@ const DEFAULT_PLATFORMS = [
     id: "twitter",
     key: "twitter",
     name: "X / Twitter",
+  },
+  {
+    id: "youtube",
+    key: "youtube",
+    name: "YouTube",
+  },
+  {
+    id: "zernio",
+    key: "zernio",
+    name: "Zapier / Zernio",
   },
 ];
 
@@ -222,6 +246,14 @@ function getPlatformName(account) {
     return "X / Twitter";
   }
 
+  if (platform.includes("youtube")) {
+    return "YouTube";
+  }
+
+  if (platform.includes("zernio") || platform.includes("zapier")) {
+    return "Zapier / Zernio";
+  }
+
   return (
     account?.platform_name ||
     account?.name ||
@@ -242,6 +274,15 @@ function getAccountName(account) {
 }
 
 function getAccountStatus(account) {
+  // The real backend column is `is_active` (boolean).
+  // Check it FIRST - this is the source of truth that
+  // was being ignored before, which is why accounts
+  // could look "Inactive" (or vice versa) right after
+  // connecting even though the row itself was fine.
+  if (typeof account?.is_active === "boolean") {
+    return account.is_active ? "active" : "inactive";
+  }
+
   const value = String(
     account?.status ||
       account?.connection_status ||
@@ -341,8 +382,34 @@ function Accounts() {
   const [confirmDelete, setConfirmDelete] =
     useState(null);
 
+  const [zernioAccounts, setZernioAccounts] =
+    useState([]);
+
+  const [showZernioModal, setShowZernioModal] =
+    useState(false);
+
   useEffect(() => {
     loadAccounts();
+
+    const params = new URLSearchParams(window.location.search);
+    const oauthStatus = params.get("oauth");
+    const zernioStatus = params.get("zernio");
+
+    if (oauthStatus === "success") {
+      const platform = params.get("platform") || "social platform";
+      setSuccess(`${getPlatformName({ platform })} connected successfully.`);
+      window.history.replaceState({}, document.title, "/accounts");
+    }
+
+    if (oauthStatus === "error") {
+      setError(params.get("message") || "OAuth connection failed.");
+      window.history.replaceState({}, document.title, "/accounts");
+    }
+
+    if (zernioStatus === "success") {
+      setSuccess("Zernio account connected successfully.");
+      window.history.replaceState({}, document.title, "/accounts");
+    }
   }, []);
 
   async function loadAccounts(
@@ -360,6 +427,7 @@ function Accounts() {
       const [
         accountData,
         platformData,
+        zernioData,
       ] = await Promise.all([
         apiRequest(
           "/api/social-accounts"
@@ -367,11 +435,30 @@ function Accounts() {
         apiRequest(
           "/api/platforms"
         ).catch(() => null),
+        apiRequest(
+          "/api/zernio/accounts"
+        ).catch(() => ({ accounts: [] })),
       ]);
 
-      setAccounts(
-        normalizeList(accountData)
-      );
+      const localAccounts = normalizeList(accountData);
+      const remoteZernioAccounts = normalizeList(zernioData);
+
+      const normalizedZernio = remoteZernioAccounts.map((account) => ({
+        id: `zernio:${account._id || account.id}`,
+        provider: "zernio",
+        zernio_account_id: account._id || account.id,
+        platform: account.platform,
+        platform_name: account.platform,
+        username: account.username,
+        display_name: account.displayName || account.username,
+        account_url: account.profileUrl,
+        profile_image: account.profileImageUrl || null,
+        is_active: account.isActive !== false,
+        created_at: account.createdAt || null,
+      }));
+
+      setZernioAccounts(normalizedZernio);
+      setAccounts([...localAccounts, ...normalizedZernio]);
 
       const normalizedPlatforms =
         normalizeList(platformData);
@@ -481,6 +568,25 @@ function Accounts() {
     };
   }, [accounts]);
 
+  const displayPlatforms = useMemo(() => {
+    const filtered = (platforms || []).filter((item) => {
+      const key = getPlatformKey(item);
+      return key !== "pinterest" && key !== "zernio";
+    });
+
+    const hasYoutube = filtered.some((item) => getPlatformKey(item) === "youtube");
+    const hasZernio = filtered.some((item) => getPlatformKey(item) === "zernio");
+
+    if (!hasYoutube) {
+      filtered.push({ id: "youtube", key: "youtube", name: "YouTube" });
+    }
+    if (!hasZernio) {
+      filtered.push({ id: "zernio", key: "zernio", name: "Zapier / Zernio" });
+    }
+
+    return filtered;
+  }, [platforms]);
+
   function clearMessages() {
     setError("");
     setSuccess("");
@@ -500,6 +606,20 @@ function Accounts() {
   async function handleDelete(
     account
   ) {
+    if (account?.provider === "zernio") {
+      setConfirmDelete(null);
+      setMenuId(null);
+      try {
+        await apiRequest(`/api/zernio/accounts/${encodeURIComponent(account.zernio_account_id)}`, { method: "DELETE" });
+        setZernioAccounts((current) => current.filter((item) => item.zernio_account_id !== account.zernio_account_id));
+        setAccounts((current) => current.filter((item) => item.id !== account.id));
+        setSuccess("Zernio account disconnected.");
+      } catch (err) {
+        setError(err?.message || "Could not disconnect the Zernio account.");
+      }
+      return;
+    }
+
     if (!account?.id) {
       setError(
         "This account does not have a valid ID."
@@ -544,6 +664,12 @@ function Accounts() {
   async function handleToggle(
     account
   ) {
+    if (account?.provider === "zernio") {
+      setError("Zernio account status is managed by Zernio. Use Disconnect or reconnect it there.");
+      setMenuId(null);
+      return;
+    }
+
     if (!account?.id) {
       setError(
         "This account does not have a valid ID."
@@ -566,10 +692,9 @@ function Accounts() {
           {
             method: "PATCH",
             body: JSON.stringify({
-              status:
-                currentlyActive
-                  ? "inactive"
-                  : "active",
+              // Real DB column is `is_active`
+              // (boolean) - not `status`.
+              is_active: !currentlyActive,
             }),
           }
         );
@@ -591,11 +716,11 @@ function Accounts() {
           return {
             ...item,
             ...(updated || {}),
-            status:
-              updated?.status ||
-              (currentlyActive
-                ? "inactive"
-                : "active"),
+            is_active:
+              typeof updated?.is_active ===
+              "boolean"
+                ? updated.is_active
+                : !currentlyActive,
           };
         })
       );
@@ -619,57 +744,38 @@ function Accounts() {
     setMenuId(null);
   }
 
-  async function handleManualConnect(
-    formData
-  ) {
+  async function handleManualConnect(formData) {
+    const platform = String(formData?.platform || "").toLowerCase().trim();
+    if (!platform) throw new Error("Please select a platform.");
+
+    if (platform === "zernio") {
+      setShowZernioModal(true);
+      return;
+    }
+
     setError("");
     setSuccess("");
 
     try {
-      const payload = {
-        platform:
-          formData.platform,
-        username:
-          formData.username.trim(),
-        account_name:
-          formData.username.trim(),
-        status: "active",
-      };
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data?.session?.access_token;
 
-      const result =
-        await apiRequest(
-          "/api/social-accounts",
-          {
-            method: "POST",
-            body: JSON.stringify(
-              payload
-            ),
-          }
-        );
-
-      const newAccount =
-        result?.account ||
-        result;
-
-      if (newAccount) {
-        setAccounts((current) => [
-          newAccount,
-          ...current,
-        ]);
-      } else {
-        await loadAccounts();
+      if (!accessToken) {
+        throw new Error("Your session has expired. Please sign in again.");
       }
 
-      setShowAddModal(false);
+      const response = await apiRequest(`/api/oauth/${platform}/connect`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-      setSuccess(
-        "Account added successfully."
-      );
+      if (!response?.authorization_url) {
+        throw new Error("OAuth authorization URL was not returned.");
+      }
+
+      window.location.assign(response.authorization_url);
     } catch (err) {
-      setError(
-        err.message ||
-          "Could not add account."
-      );
+      setError(err?.message || "Could not start OAuth connection.");
+      throw err;
     }
   }
 
@@ -848,7 +954,7 @@ function Accounts() {
         </div>
 
         <div className="platform-grid">
-          {platforms.map(
+          {displayPlatforms.map(
             (item, index) => {
               const key =
                 getPlatformKey(
@@ -925,15 +1031,18 @@ function Accounts() {
 
                   <button
                     className="platform-connect"
-                    onClick={
-                      openAddAccount
+                    onClick={() =>
+                      key === "zernio"
+                        ? setShowZernioModal(true)
+                        : handleManualConnect({
+                            platform: key,
+                          })
                     }
                   >
-                    <Link2
-                      size={15}
-                    />
-
-                    {connectedCount
+                    <Link2 size={15} />
+                    {key === "zernio"
+                      ? (connectedCount ? "Manage connection" : "Connect via Zernio")
+                      : connectedCount
                       ? "Add another"
                       : "Connect account"}
                   </button>
@@ -1024,6 +1133,10 @@ function Accounts() {
 
               <option value="twitter">
                 X / Twitter
+              </option>
+
+              <option value="youtube">
+                YouTube
               </option>
             </select>
 
@@ -1258,7 +1371,7 @@ function Accounts() {
 
       {showAddModal && (
         <AddAccountModal
-          platforms={platforms}
+          platforms={displayPlatforms}
           onClose={closeModal}
           onSubmit={
             handleManualConnect
@@ -1276,6 +1389,20 @@ function Accounts() {
               null
             )
           }
+        />
+      )}
+
+      {showZernioModal && (
+        <ZernioConnectModal
+          onClose={() => setShowZernioModal(false)}
+          onConnect={async (platform) => {
+            const response = await apiRequest(`/api/zernio/connect/${platform}`);
+            if (!response?.authorization_url) {
+              throw new Error("Zernio authorization URL was not returned.");
+            }
+            window.location.assign(response.authorization_url);
+          }}
+          connectedAccounts={zernioAccounts}
         />
       )}
 
@@ -1363,15 +1490,99 @@ function FilterIcon() {
   );
 }
 
+function ZernioConnectModal({
+  onClose,
+  onConnect,
+  connectedAccounts,
+}) {
+  const [saving, setSaving] = useState("");
+  const [error, setError] = useState("");
+
+  async function connect(platform) {
+    setSaving(platform);
+    setError("");
+    try {
+      await onConnect(platform);
+    } catch (err) {
+      setError(err?.message || "Could not start the Zernio connection.");
+      setSaving("");
+    }
+  }
+
+  return (
+    <div className="accounts-modal-backdrop" onClick={onClose}>
+      <div
+        className="account-modal details-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-head">
+          <div>
+            <span>ZAPIER / ZERNIO</span>
+            <h2>Connect through Zernio</h2>
+          </div>
+          <button type="button" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="modal-info">
+          <Link2 size={16} />
+          <p>
+            Your backend Zernio API key stays private. OAuth is handled by Zernio,
+            and the connected Facebook/Instagram accounts remain separate from
+            your direct Meta connections.
+          </p>
+        </div>
+
+        {error && <div className="modal-error"><AlertCircle size={15} />{error}</div>}
+
+        <div className="details-grid">
+          <button
+            className="platform-connect"
+            type="button"
+            disabled={Boolean(saving)}
+            onClick={() => connect("facebook")}
+          >
+            <span>Facebook</span>
+            <span>{saving === "facebook" ? "Opening…" : "Connect"}</span>
+          </button>
+
+          <button
+            className="platform-connect"
+            type="button"
+            disabled={Boolean(saving)}
+            onClick={() => connect("instagram")}
+          >
+            <span>Instagram</span>
+            <span>{saving === "instagram" ? "Opening…" : "Connect"}</span>
+          </button>
+        </div>
+
+        <div className="details-grid" style={{ marginTop: 16 }}>
+          <div>
+            <span>Zernio connected accounts</span>
+            <strong>{connectedAccounts.length}</strong>
+          </div>
+          <div>
+            <span>Posting</span>
+            <strong>Enabled via API</strong>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="modal-cancel" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddAccountModal({
   platforms,
   onClose,
   onSubmit,
 }) {
   const [platform, setPlatform] =
-    useState("");
-
-  const [username, setUsername] =
     useState("");
 
   const [saving, setSaving] =
@@ -1390,20 +1601,12 @@ function AddAccountModal({
       return;
     }
 
-    if (!username.trim()) {
-      setError(
-        "Please enter an account name."
-      );
-      return;
-    }
-
     setSaving(true);
     setError("");
 
     try {
       await onSubmit({
         platform,
-        username,
       });
     } catch (err) {
       setError(
@@ -1450,9 +1653,9 @@ function AddAccountModal({
           <Link2 size={16} />
 
           <p>
-            OAuth authorization will be
-            added later when platform
-            credentials are available.
+            You will be redirected to the
+            platform to authorize this account.
+            Your credentials stay on the backend.
           </p>
         </div>
 
@@ -1511,21 +1714,6 @@ function AddAccountModal({
           </div>
         </label>
 
-        <label className="modal-field">
-          <span>
-            Account name / username
-          </span>
-
-          <input
-            value={username}
-            onChange={(event) =>
-              setUsername(
-                event.target.value
-              )
-            }
-            placeholder="@youraccount"
-          />
-        </label>
 
         <div className="modal-actions">
           <button
@@ -1549,7 +1737,7 @@ function AddAccountModal({
             ) : (
               <>
                 <Link2 size={15} />
-                Add Account
+                Continue to OAuth
               </>
             )}
           </button>
