@@ -165,7 +165,7 @@ class Settings(BaseSettings):
 
     TIKTOK_CLIENT_SECRET: str = ""
 
-    TIKTOK_REDIRECT_URI: str = "https://your-domain.com/api/tiktok/callback"
+    TIKTOK_REDIRECT_URI: str = "https://aisocialmanager.duckdns.org/api/oauth/tiktok/callback"
 
     TIKTOK_SCOPES: str = (
         "user.info.basic video.publish"
