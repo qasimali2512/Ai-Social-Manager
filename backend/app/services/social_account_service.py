@@ -219,12 +219,26 @@ def save_oauth_account(
         or profile.get("avatar_url")
     )
 
+    # The provider's own account/member id - e.g. LinkedIn's
+    # "sub" claim, X's numeric user id. Publishing needs this
+    # separately from `username` (LinkedIn's author URN is
+    # built from it: urn:li:person:<platform_account_id>).
+    # It used to only ever be used as a fallback for `username`
+    # above and was never actually persisted, which is why
+    # publishing to LinkedIn failed with "author URN is missing".
+    platform_account_id = (
+        profile.get("id")
+        or profile.get("user_id")
+        or None
+    )
+
     payload = {
         "user_id": user_id,
         "platform_id": platform_id,
         "username": username,
         "display_name": display_name,
         "avatar_url": avatar_url,
+        "platform_account_id": platform_account_id,
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_expires_at": token_expires_at,

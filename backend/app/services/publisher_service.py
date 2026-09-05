@@ -558,12 +558,20 @@ async def _x_upload_media(
     category = _x_media_category(content_type)
 
     # INIT
+    #
+    # X's newer /2/media/upload endpoint expects a JSON body for
+    # INIT/FINALIZE (only APPEND is multipart/form-data). Sending
+    # these as form fields (the old v1.1-style `data=`) means the
+    # server never recognizes `media_category` at all, which is
+    # why it used to fail with "The query parameter [media_category]
+    # is not one of []" - an empty allowed-list, because form
+    # fields aren't part of this endpoint's schema.
     init_response = await client.post(
         X_MEDIA_UPLOAD_URL,
         headers=auth_headers,
-        data={
+        json={
             "command": "INIT",
-            "total_bytes": str(total_bytes),
+            "total_bytes": total_bytes,
             "media_type": content_type,
             "media_category": category,
         },
@@ -598,11 +606,11 @@ async def _x_upload_media(
             return None, f"X media APPEND failed: {_error(append_response)}"
         segment_index += 1
 
-    # FINALIZE
+    # FINALIZE (also JSON - see note above on INIT).
     finalize_response = await client.post(
         X_MEDIA_UPLOAD_URL,
         headers=auth_headers,
-        data={"command": "FINALIZE", "media_id": media_id},
+        json={"command": "FINALIZE", "media_id": media_id},
     )
     if finalize_response.status_code >= 400:
         return None, f"X media FINALIZE failed: {_error(finalize_response)}"
