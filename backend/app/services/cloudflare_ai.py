@@ -191,6 +191,25 @@ async def generate_text(
         message = first_choice.get("message") or {}
         content = message.get("content")
 
+        # ---------------------------------------------
+        # Some "reasoning" models (e.g.
+        # @cf/zai-org/glm-4.7-flash) leave
+        # message.content = None and instead put
+        # everything - including the final answer - in
+        # message.reasoning / message.reasoning_content.
+        # Fall back to extracting the final answer out
+        # of that field instead of failing outright.
+        # ---------------------------------------------
+        if not content:
+            reasoning_text = (
+                message.get("reasoning_content")
+                or message.get("reasoning")
+            )
+            if reasoning_text:
+                content = _extract_final_answer_from_reasoning(
+                    reasoning_text
+                )
+
     # -------------------------------------------------
     # Simpler Workers AI text-generation format:
     # {"result": {"response": "..."}}
@@ -208,6 +227,65 @@ async def generate_text(
         )
 
     return str(content).strip()
+
+
+def _extract_final_answer_from_reasoning(reasoning_text: str) -> str | None:
+    """
+    Best-effort extraction of the final generated caption out of a
+    reasoning-model "thinking" transcript, for models that fail to
+    populate message.content directly (e.g. glm-4.7-flash).
+
+    The model's reasoning text typically ends with something like:
+        **Final Output Generation** ...
+            *Text:* <final caption>
+            *Hashtags:* <hashtags>
+
+    We look for common markers ("Final Output", "Final Answer",
+    "*Text:*", "Final Caption", etc.) and, failing that, fall back to
+    the last non-empty paragraph of the reasoning text.
+    """
+    import re
+
+    text = reasoning_text.strip()
+    if not text:
+        return None
+
+    # Try to find an explicit "Text:" / "Caption:" marker, usually
+    # near the end, and grab everything after it up to the next
+    # markdown bullet/heading boundary.
+    text_marker = re.search(
+        r"\*+\s*Text:?\*+\s*(.+?)(?:\n\s*\*+\s*Hashtags|\Z)",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    hashtags_marker = re.search(
+        r"\*+\s*Hashtags:?\*+\s*(.+?)\Z",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    if text_marker:
+        caption = text_marker.group(1).strip(" \n*")
+        if hashtags_marker:
+            hashtags = hashtags_marker.group(1).strip(" \n*")
+            # Hashtags may be comma-separated in the reasoning trace;
+            # normalize to space-separated "#tag" tokens.
+            tags = re.findall(r"#\w+", hashtags)
+            if tags:
+                caption = f"{caption}\n\n{' '.join(tags)}"
+        return caption.strip()
+
+    # Fallback: use the last non-empty paragraph/bullet of the
+    # reasoning text, which is usually the final drafted version.
+    paragraphs = [
+        p.strip(" \n*-")
+        for p in re.split(r"\n\s*\n", text)
+        if p.strip(" \n*-")
+    ]
+    if paragraphs:
+        return paragraphs[-1]
+
+    return None
 
 
 # ---------------------------------------------------------

@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     X_CLIENT_SECRET: str = ""
 
     X_SCOPES: str = (
-        "tweet.read tweet.write users.read offline.access"
+        "tweet.read tweet.write users.read offline.access media.write"
     )
 
     # ============================================

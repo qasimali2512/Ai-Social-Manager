@@ -341,13 +341,46 @@ function Posts() {
         "/api/social-accounts"
       );
 
-      setAccounts(
-        Array.isArray(data)
-          ? data
-          : data?.accounts ||
-              data?.data ||
-              []
-      );
+      const localAccounts = Array.isArray(data)
+        ? data
+        : data?.accounts ||
+            data?.data ||
+            [];
+
+      // Zernio accounts live outside the local
+      // social_accounts table (they're connected via
+      // Zernio, not direct OAuth), so they need a
+      // separate fetch + merge - same as Create Post.
+      let remoteZernio = [];
+      try {
+        const zernioData = await apiRequest(
+          "/api/zernio/accounts"
+        );
+
+        remoteZernio = (
+          zernioData?.accounts || []
+        ).map((account) => ({
+          id: `zernio:${account._id || account.id}`,
+          provider: "zernio",
+          zernio_account_id:
+            account._id || account.id,
+          platform: account.platform,
+          platform_name: account.platform,
+          username: account.username,
+          display_name:
+            account.displayName ||
+            account.username,
+          is_active:
+            account.isActive !== false,
+        }));
+      } catch {
+        remoteZernio = [];
+      }
+
+      setAccounts([
+        ...localAccounts,
+        ...remoteZernio,
+      ]);
     } catch {
       setAccounts([]);
     }
@@ -385,7 +418,13 @@ function Posts() {
         ).find(
           (item) =>
             item?.id ===
-            account?.platform_id
+              account?.platform_id ||
+            String(
+              item?.key || item?.slug || ""
+            ).toLowerCase() ===
+              String(
+                account?.platform || ""
+              ).toLowerCase()
         );
 
         const platformName =
@@ -402,7 +441,18 @@ function Posts() {
 
         return {
           id: account?.id,
-          platformId: account?.platform_id,
+          platformId:
+            matchedPlatform?.id ||
+            account?.platform_id,
+          provider:
+            account?.provider || "direct",
+          zernioAccountId:
+            account?.zernio_account_id ||
+            null,
+          platformKey:
+            account?.platform ||
+            matchedPlatform?.key ||
+            matchedPlatform?.slug,
           label: handle
             ? `${platformName} — @${handle}`
             : platformName,
@@ -696,6 +746,103 @@ function Posts() {
         scheduleValue
       ).toISOString();
 
+      const chosenAccount =
+        connectedAccounts.find(
+          (account) =>
+            account.id ===
+            selectedAccountId
+        );
+
+      // Zernio accounts are virtual frontend accounts,
+      // so they do not have a local social_accounts
+      // row / platform_id. Schedule them directly
+      // through Zernio instead of the local
+      // publications endpoint.
+      if (chosenAccount?.provider === "zernio") {
+        const zernioData = await apiRequest(
+          "/api/zernio/posts",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              account_id:
+                chosenAccount.zernioAccountId,
+              platform:
+                chosenAccount.platformKey,
+              content: getPostContent(
+                schedulingPost
+              ),
+              media_urls: getImage(
+                schedulingPost
+              )
+                ? [getImage(schedulingPost)]
+                : [],
+              scheduled_for: scheduledIso,
+              title: getPostTitle(
+                schedulingPost
+              ),
+            }),
+          }
+        );
+
+        // Local status update, best-effort - Zernio
+        // already has the post scheduled even if this
+        // fails.
+        try {
+          const localData = await apiRequest(
+            `/api/posts/${schedulingPost.id}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({
+                status: "scheduled",
+                scheduled_at: scheduledIso,
+              }),
+            }
+          );
+
+          const updatedPost =
+            localData?.post || null;
+
+          if (updatedPost) {
+            setPosts((current) =>
+              current.map((item) =>
+                String(item.id) ===
+                String(schedulingPost.id)
+                  ? {
+                      ...item,
+                      ...updatedPost,
+                    }
+                  : item
+              )
+            );
+
+            setSelectedPost((current) =>
+              current &&
+              String(current.id) ===
+                String(schedulingPost.id)
+                ? {
+                    ...current,
+                    ...updatedPost,
+                  }
+                : current
+            );
+          }
+        } catch {
+          console.warn(
+            "Zernio scheduled the post, but local status update failed."
+          );
+        }
+
+        setShowScheduleModal(false);
+        setSchedulingPost(null);
+
+        setSuccess(
+          zernioData?.message ||
+            "Post scheduled successfully via Zernio."
+        );
+
+        return;
+      }
+
       // 1) Mark the post itself as scheduled.
       const data = await apiRequest(
         `/api/posts/${schedulingPost.id}`,
@@ -714,13 +861,6 @@ function Posts() {
       // 2) If the user picked a connected account,
       // attach the post to that platform/account so
       // it actually knows WHERE to publish.
-      const chosenAccount =
-        connectedAccounts.find(
-          (account) =>
-            account.id ===
-            selectedAccountId
-        );
-
       if (chosenAccount) {
         try {
           await apiRequest(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import mimetypes
 import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -9,11 +11,20 @@ import httpx
 
 from app.core.config import settings
 from app.db.supabase import supabase
+from app.services.platform_adapters.youtube import YouTubeAdapter
 
 
 HTTP_TIMEOUT = float(os.getenv("PUBLISH_HTTP_TIMEOUT", "60"))
 META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "").strip()
 LINKEDIN_VERSION = os.getenv("LINKEDIN_VERSION", "202608").strip()
+
+# X media upload (chunked INIT/APPEND/FINALIZE/STATUS flow).
+# Uses the newer /2/media/upload endpoint so it works with the
+# same OAuth 2.0 user-context Bearer token already used for
+# /2/tweets, instead of requiring separate OAuth 1.0a credentials.
+X_MEDIA_UPLOAD_URL = "https://api.x.com/2/media/upload"
+X_MEDIA_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB per APPEND, X's documented max.
+X_MAX_IMAGES_PER_POST = 4
 
 
 def _token(account: dict[str, Any]) -> str:
@@ -42,6 +53,12 @@ def _error(response: httpx.Response) -> str:
             err = data.get("error")
             if isinstance(err, dict):
                 return str(err.get("message") or data)
+            # X's media upload endpoint returns {"errors": [...]}
+            errors = data.get("errors")
+            if isinstance(errors, list) and errors:
+                first = errors[0]
+                if isinstance(first, dict):
+                    return str(first.get("message") or first)
             return str(data.get("message") or data)
     except Exception:
         pass
@@ -55,6 +72,8 @@ async def _request_json(
     headers: dict[str, str] | None = None,
     params: dict[str, Any] | None = None,
     json: dict[str, Any] | None = None,
+    data: dict[str, Any] | None = None,
+    files: dict[str, Any] | None = None,
 ) -> tuple[httpx.Response, dict[str, Any]]:
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         response = await client.request(
@@ -63,14 +82,16 @@ async def _request_json(
             headers=headers,
             params=params,
             json=json,
+            data=data,
+            files=files,
         )
 
     try:
-        data = response.json()
+        parsed = response.json()
     except Exception:
-        data = {}
+        parsed = {}
 
-    return response, data if isinstance(data, dict) else {}
+    return response, parsed if isinstance(parsed, dict) else {}
 
 
 async def _refresh_google_access_token(account: dict[str, Any]) -> str | None:
@@ -350,7 +371,6 @@ async def _publish_instagram(
                     "success": False,
                     "error": "Instagram media processing failed.",
                 }
-            import asyncio
             await asyncio.sleep(2)
 
     response, publish_data = await _request_json(
@@ -479,6 +499,151 @@ async def _publish_linkedin(
     }
 
 
+# ----------------------------------------------------------------
+# X (Twitter) media upload — chunked INIT / APPEND / FINALIZE /
+# STATUS flow against the /2/media/upload endpoint.
+#
+# Previously this whole thing was rejected outright:
+#   "X text publishing is enabled, but media upload requires an
+#    X media-upload credential flow."
+# That's now implemented below.
+#
+# NOTE: this endpoint requires the "media.write" OAuth scope.
+# Update X_SCOPES in your .env, e.g.:
+#   X_SCOPES=tweet.read tweet.write users.read offline.access media.write
+# Existing connected X accounts were authorized without this
+# scope, so users must disconnect + reconnect X once after the
+# scope change for media uploads to work.
+# ----------------------------------------------------------------
+
+def _x_media_category(content_type: str) -> str:
+    if content_type.startswith("video/"):
+        return "tweet_video"
+    if content_type == "image/gif":
+        return "tweet_gif"
+    return "tweet_image"
+
+
+def _x_is_video_or_gif(url: str) -> bool:
+    lowered = url.lower().split("?", 1)[0]
+    return lowered.endswith((".mp4", ".mov", ".m4v", ".avi", ".gif"))
+
+
+async def _x_upload_media(
+    client: httpx.AsyncClient,
+    token: str,
+    media_url: str,
+) -> tuple[str | None, str | None]:
+    """
+    Downloads a single media file and uploads it to X via the
+    chunked media-upload flow. Returns (media_id, error) — exactly
+    one of which will be set.
+    """
+
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        source_response = await client.get(media_url)
+        source_response.raise_for_status()
+    except httpx.HTTPError as exc:
+        return None, f"Could not download media from '{media_url}': {exc}"
+
+    media_bytes = source_response.content
+    content_type = (
+        source_response.headers.get("content-type", "").split(";")[0].strip()
+        or mimetypes.guess_type(media_url)[0]
+        or "application/octet-stream"
+    )
+    total_bytes = len(media_bytes)
+    category = _x_media_category(content_type)
+
+    # INIT
+    init_response = await client.post(
+        X_MEDIA_UPLOAD_URL,
+        headers=auth_headers,
+        data={
+            "command": "INIT",
+            "total_bytes": str(total_bytes),
+            "media_type": content_type,
+            "media_category": category,
+        },
+    )
+    if init_response.status_code >= 400:
+        return None, f"X media INIT failed: {_error(init_response)}"
+
+    try:
+        init_data = init_response.json().get("data", {})
+    except Exception:
+        init_data = {}
+
+    media_id = init_data.get("id")
+    if not media_id:
+        return None, "X did not return a media id from the INIT step."
+
+    # APPEND, in 4MB chunks.
+    segment_index = 0
+    for offset in range(0, total_bytes, X_MEDIA_CHUNK_SIZE):
+        chunk = media_bytes[offset:offset + X_MEDIA_CHUNK_SIZE]
+        append_response = await client.post(
+            X_MEDIA_UPLOAD_URL,
+            headers=auth_headers,
+            data={
+                "command": "APPEND",
+                "media_id": media_id,
+                "segment_index": str(segment_index),
+            },
+            files={"media": ("chunk", chunk, "application/octet-stream")},
+        )
+        if append_response.status_code >= 400:
+            return None, f"X media APPEND failed: {_error(append_response)}"
+        segment_index += 1
+
+    # FINALIZE
+    finalize_response = await client.post(
+        X_MEDIA_UPLOAD_URL,
+        headers=auth_headers,
+        data={"command": "FINALIZE", "media_id": media_id},
+    )
+    if finalize_response.status_code >= 400:
+        return None, f"X media FINALIZE failed: {_error(finalize_response)}"
+
+    try:
+        finalize_data = finalize_response.json().get("data", {})
+    except Exception:
+        finalize_data = {}
+
+    processing_info = finalize_data.get("processing_info")
+
+    # Video/GIF uploads process asynchronously — poll STATUS until done.
+    while processing_info and processing_info.get("state") in {"pending", "in_progress"}:
+        wait_seconds = processing_info.get("check_after_secs", 2)
+        await asyncio.sleep(wait_seconds)
+
+        status_response = await client.get(
+            X_MEDIA_UPLOAD_URL,
+            headers=auth_headers,
+            params={"command": "STATUS", "media_id": media_id},
+        )
+        if status_response.status_code >= 400:
+            return None, f"X media STATUS check failed: {_error(status_response)}"
+
+        try:
+            status_data = status_response.json().get("data", {})
+        except Exception:
+            status_data = {}
+
+        processing_info = status_data.get("processing_info")
+
+        if processing_info and processing_info.get("state") == "failed":
+            error_detail = (
+                processing_info.get("error", {}).get("message")
+                or "processing failed"
+            )
+            return None, f"X media processing failed: {error_detail}"
+
+    return str(media_id), None
+
+
 async def _publish_x(
     content: str,
     media_urls: list[str],
@@ -488,14 +653,27 @@ async def _publish_x(
     if not token:
         return {"success": False, "error": "X access token is missing."}
 
-    # X API v2 text publishing uses the authenticated user context. Media
-    # requires a separate media-upload flow and is intentionally rejected here
-    # instead of pretending a public URL can be attached directly.
+    media_ids: list[str] = []
+
     if media_urls:
-        return {
-            "success": False,
-            "error": "X text publishing is enabled, but media upload requires an X media-upload credential flow.",
-        }
+        # X allows either exactly one video/GIF, OR up to 4 images,
+        # per post — never a mix.
+        upload_targets = (
+            media_urls[:1]
+            if _x_is_video_or_gif(media_urls[0])
+            else media_urls[:X_MAX_IMAGES_PER_POST]
+        )
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            for url in upload_targets:
+                media_id, error = await _x_upload_media(client, token, url)
+                if error:
+                    return {"success": False, "error": error}
+                media_ids.append(media_id)
+
+    payload: dict[str, Any] = {"text": content}
+    if media_ids:
+        payload["media"] = {"media_ids": media_ids}
 
     response, data = await _request_json(
         "POST",
@@ -505,7 +683,7 @@ async def _publish_x(
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
-        json={"text": content},
+        json=payload,
     )
 
     if response.status_code >= 400:
