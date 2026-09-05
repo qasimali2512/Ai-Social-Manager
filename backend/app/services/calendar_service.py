@@ -131,4 +131,105 @@ def get_calendar_events(
             ),
         })
 
+    events = _augment_with_standalone_posts(
+        user_id,
+        events,
+        start_date,
+        end_date,
+    )
+
+    return events
+
+
+def _augment_with_standalone_posts(
+    user_id: str,
+    events: list,
+    start_date: date | None = None,
+    end_date: date | None = None,
+):
+    """
+    Add posts that were scheduled directly (e.g. via
+    Zernio/Zapier) and therefore have no local
+    `post_publications` row, so they still appear on the
+    calendar.
+    """
+
+    linked_post_ids = {
+        event.get("post_id")
+        for event in events
+        if event.get("post_id")
+    }
+
+    posts_response = (
+        supabase
+        .table("posts")
+        .select(
+            "id,status,scheduled_at,platform,created_at"
+        )
+        .eq("user_id", user_id)
+        .eq("status", "scheduled")
+        .execute()
+    )
+
+    posts = posts_response.data or []
+
+    for post in posts:
+        if post.get("id") in linked_post_ids:
+            continue
+
+        scheduled_at = post.get(
+            "scheduled_at"
+        )
+
+        if not scheduled_at:
+            continue
+
+        event_date = _parse_date(
+            scheduled_at
+        )
+
+        if not event_date:
+            continue
+
+        if (
+            start_date
+            and event_date < start_date
+        ):
+            continue
+
+        if (
+            end_date
+            and event_date > end_date
+        ):
+            continue
+
+        platform_label = (
+            post.get("platform")
+            or "Zapier / Zernio"
+        )
+
+        events.append({
+            "id": f"post:{post.get('id')}",
+            "post_id": post.get("id"),
+            "platform_id": None,
+            "platform_name": platform_label,
+            "platform_slug": str(
+                platform_label
+            ).lower(),
+            "platform_icon": None,
+            "status": post.get("status"),
+            "scheduled_at": scheduled_at,
+            "published_at": None,
+            "created_at": post.get(
+                "created_at"
+            ),
+            "error_message": None,
+        })
+
+    events.sort(
+        key=lambda x: (
+            x.get("scheduled_at") or ""
+        )
+    )
+
     return events

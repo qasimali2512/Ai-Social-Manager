@@ -65,6 +65,8 @@ class PostUpdate(BaseModel):
 
     media_url: str | None = None
 
+    platform: str | None = None
+
 
 class PostPublicationCreate(BaseModel):
     platform_id: str

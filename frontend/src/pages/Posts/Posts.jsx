@@ -795,6 +795,7 @@ function Posts() {
               body: JSON.stringify({
                 status: "scheduled",
                 scheduled_at: scheduledIso,
+                platform: chosenAccount.platformKey,
               }),
             }
           );

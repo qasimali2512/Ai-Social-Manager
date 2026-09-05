@@ -13,27 +13,16 @@ from app.services.platform_service import (
 #
 #   id, user_id, platform_id, username, display_name,
 #   avatar_url, account_url, access_token, refresh_token,
-#   token_expires_at, is_active, created_at, updated_at,
-#   platform_account_id
+#   token_expires_at, is_active, created_at, updated_at
 #
-# FIX (LinkedIn "author URN is missing" bug):
-#   The provider's own user id (LinkedIn's `sub` URN, X's
-#   numeric user id, etc.) was never being persisted anywhere.
-#   publisher_service._platform_account_id() reads
-#   `platform_account_id` / `platform_user_id` / `account_id`
-#   off the account row - all three were always empty, so
-#   LinkedIn publishing failed on every single post with
-#   "LinkedIn author URN is missing from the connected account."
-#
-#   `platform_account_id` is now written on every OAuth
-#   connect/reconnect below. Requires this column to exist:
-#
-#     ALTER TABLE social_accounts
-#       ADD COLUMN IF NOT EXISTS platform_account_id text;
-#
-#   NOTE: accounts connected *before* this fix still won't have
-#   a value here. Users must disconnect + reconnect LinkedIn
-#   (and X) once so the callback re-runs and backfills it.
+# Important differences from earlier assumptions:
+#   - platform is stored as `platform_id` (FK -> platforms.id),
+#     not a plain "platform" text column.
+#   - There is no `account_name` or `platform_account_id`
+#     column. `username` is NOT NULL and, together with
+#     (user_id, platform_id), is the uniqueness key.
+#   - There is no `expires_in` (seconds) column - instead
+#     `token_expires_at` stores an absolute timestamp.
 #
 # Every query goes through safe_execute() instead of a plain
 # .execute() - on Windows, transient socket hiccups can
@@ -127,28 +116,6 @@ def _expires_in_to_timestamp(
         datetime.now(timezone.utc)
         + timedelta(seconds=seconds)
     ).isoformat()
-
-
-def _resolve_platform_account_id(profile: dict) -> str | None:
-    """
-    Pull the provider's own user identifier out of the profile
-    dict returned by each platform adapter's get_profile():
-
-      - LinkedIn: {"id": <sub / member URN fragment>, ...}
-      - X:        {"id": <numeric user id>, ...}
-      - Meta/YouTube/etc: {"id": ...} as well
-
-    This is what publisher_service._platform_account_id() reads
-    back out at publish time (as `platform_account_id`).
-    """
-
-    value = (
-        profile.get("id")
-        or profile.get("user_id")
-        or profile.get("sub")
-    )
-
-    return str(value).strip() if value else None
 
 
 SELECT_WITH_PLATFORM = (
@@ -252,10 +219,6 @@ def save_oauth_account(
         or profile.get("avatar_url")
     )
 
-    # FIX: persist the provider's own user id so publish-time
-    # code (e.g. LinkedIn's "author" URN) can find it again.
-    platform_account_id = _resolve_platform_account_id(profile)
-
     payload = {
         "user_id": user_id,
         "platform_id": platform_id,
@@ -265,7 +228,6 @@ def save_oauth_account(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_expires_at": token_expires_at,
-        "platform_account_id": platform_account_id,
         "is_active": True,
     }
 
@@ -344,12 +306,36 @@ def update_social_account(
         .select(SELECT_WITH_PLATFORM)
     )
 
-    if not response.data:
+    if response.data:
+        return _attach_platform_info(
+            response.data[0]
+        )
+
+    # Some supabase-py / PostgREST configurations don't
+    # reliably return the updated row from an
+    # update().select() chain (e.g. missing
+    # "Prefer: return=representation", or RLS quirks).
+    # Rather than reporting a false failure when the
+    # write actually succeeded, re-fetch the row directly
+    # and only treat this as a real failure if it still
+    # doesn't reflect the change.
+    refreshed = get_social_account(
+        account_id,
+        user_id,
+    )
+
+    if not refreshed:
         return None
 
-    return _attach_platform_info(
-        response.data[0]
+    mismatched = any(
+        refreshed.get(key) != value
+        for key, value in clean_data.items()
     )
+
+    if mismatched:
+        return None
+
+    return refreshed
 
 
 def delete_social_account(
@@ -364,4 +350,17 @@ def delete_social_account(
         .eq("user_id", user_id)
     )
 
-    return bool(response.data)
+    if response.data:
+        return True
+
+    # Some supabase-py / PostgREST configurations don't
+    # return the deleted row(s) from a plain delete()
+    # call (no "Prefer: return=representation"). Confirm
+    # the row is actually gone instead of assuming
+    # failure just because `response.data` was empty.
+    still_exists = get_social_account(
+        account_id,
+        user_id,
+    )
+
+    return still_exists is None

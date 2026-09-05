@@ -12,7 +12,7 @@ def get_dashboard(user_id: str):
     posts_response = safe_execute(
         supabase
         .table("posts")
-        .select("id,status,created_at")
+        .select("id,status,created_at,scheduled_at,platform")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
     )
@@ -131,6 +131,63 @@ def get_dashboard(user_id: str):
             ),
             "status": status,
             "scheduled_at": item.get(
+                "scheduled_at"
+            ),
+        })
+
+    upcoming.sort(
+        key=lambda x: (
+            x.get("scheduled_at")
+            or ""
+        )
+    )
+
+    # --------------------------------------------------
+    # Standalone scheduled posts (e.g. posts scheduled
+    # via Zernio/Zapier). These are updated directly on
+    # the `posts` table and never get a local
+    # `post_publications` row (Zernio accounts are
+    # virtual and have no local social_accounts row), so
+    # without this fallback they would never show up
+    # here even though they really are scheduled.
+    # --------------------------------------------------
+
+    linked_post_ids = {
+        item.get("post_id")
+        for item in publications
+        if item.get("post_id")
+    }
+
+    for post in posts:
+        if post.get("id") in linked_post_ids:
+            continue
+
+        status = str(
+            post.get("status") or ""
+        ).lower()
+
+        if status != "scheduled":
+            continue
+
+        if not post.get("scheduled_at"):
+            continue
+
+        platform_label = (
+            post.get("platform")
+            or "Zapier / Zernio"
+        )
+
+        upcoming.append({
+            "id": f"post:{post.get('id')}",
+            "post_id": post.get("id"),
+            "platform_id": None,
+            "platform_name": platform_label,
+            "platform_slug": str(
+                platform_label
+            ).lower(),
+            "platform_icon": None,
+            "status": status,
+            "scheduled_at": post.get(
                 "scheduled_at"
             ),
         })

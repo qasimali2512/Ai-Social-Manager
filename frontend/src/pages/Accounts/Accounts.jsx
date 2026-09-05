@@ -1289,6 +1289,7 @@ function Accounts() {
 
                     <div className="account-menu-wrap">
                       <button
+                        type="button"
                         className="account-menu-button"
                         onClick={() =>
                           setMenuId(
@@ -1308,6 +1309,7 @@ function Accounts() {
                         account.id && (
                         <div className="account-menu">
                           <button
+                            type="button"
                             onClick={() =>
                               editAccount(
                                 account
@@ -1321,6 +1323,7 @@ function Accounts() {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() =>
                               handleToggle(
                                 account
@@ -1343,6 +1346,7 @@ function Accounts() {
                           </button>
 
                           <button
+                            type="button"
                             className="danger"
                             onClick={() => {
                               setConfirmDelete(
