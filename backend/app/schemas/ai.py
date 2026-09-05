@@ -5,7 +5,7 @@ class GenerateContentRequest(BaseModel):
     topic: str = Field(
         ...,
         min_length=2,
-        max_length=500,
+        max_length=5000,
     )
 
     platform: str | None = None

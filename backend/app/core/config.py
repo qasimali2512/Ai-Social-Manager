@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     )
 
     CLOUDFLARE_IMAGE_MODEL: str = (
-        "@cf/black-forest-labs/flux-2-dev"
+        "@cf/black-forest-labs/flux-2-klein-9b"
     )
 
     # FLUX [dev] supports more denoising steps than the

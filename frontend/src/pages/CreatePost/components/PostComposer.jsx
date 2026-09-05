@@ -81,11 +81,11 @@ function PostComposer({
             }
             placeholder="Example: Launch announcement for our new AI product..."
             rows={6}
-            maxLength={500}
+            maxLength={5000}
           />
 
           <span className="character-count">
-            {topic.length}/500
+            {topic.length}/5000
           </span>
 
         </div>
