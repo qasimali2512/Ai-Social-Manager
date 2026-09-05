@@ -1211,14 +1211,15 @@ function Accounts() {
 
                 return (
                   <article
-                    className="account-row"
+                    className={`account-row ${
+                      menuId === account.id ? "account-row-menu-open" : ""
+                    }`}
                     key={
                       account.id ||
                       `account-${index}`
                     }
                     style={{
-                      "--row-index":
-                        index,
+                      "--row-index": index,
                     }}
                   >
                     <div className="account-identity">
@@ -1287,84 +1288,75 @@ function Accounts() {
                         : "Connected"}
                     </div>
 
-                    <div className="account-menu-wrap">
+                    <div
+                      className="account-menu-wrap"
+                      onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
                       <button
                         type="button"
                         className="account-menu-button"
-                        onClick={() =>
-                          setMenuId(
-                            menuId ===
-                              account.id
-                              ? null
-                              : account.id
-                          )
-                        }
+                        aria-label={`Open actions for ${getAccountName(account)}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setMenuId((current) =>
+                            current === account.id ? null : account.id
+                          );
+                        }}
                       >
-                        <MoreHorizontal
-                          size={18}
-                        />
+                        <MoreHorizontal size={18} />
                       </button>
-
-                      {menuId ===
-                        account.id && (
-                        <div className="account-menu">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editAccount(
-                                account
-                              )
-                            }
-                          >
-                            <Settings2
-                              size={15}
-                            />
-                            Account details
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleToggle(
-                                account
-                              )
-                            }
-                          >
-                            {active ? (
-                              <Unplug
-                                size={15}
-                              />
-                            ) : (
-                              <CheckCircle2
-                                size={15}
-                              />
-                            )}
-
-                            {active
-                              ? "Disable account"
-                              : "Activate account"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => {
-                              setConfirmDelete(
-                                account
-                              );
-                              setMenuId(
-                                null
-                              );
-                            }}
-                          >
-                            <Trash2
-                              size={15}
-                            />
-                            Disconnect
-                          </button>
-                        </div>
-                      )}
                     </div>
+
+                    {menuId === account.id && (
+                      <div
+                        className="account-actions-panel"
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="account-action-button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            editAccount(account);
+                          }}
+                        >
+                          <Settings2 size={15} />
+                          <span>Account details</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="account-action-button"
+                          onClick={async (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setMenuId(null);
+                            await handleToggle(account);
+                          }}
+                        >
+                          {active ? <Unplug size={15} /> : <CheckCircle2 size={15} />}
+                          <span>{active ? "Disable account" : "Activate account"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="account-action-button danger"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setConfirmDelete(account);
+                            setMenuId(null);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                          <span>Disconnect</span>
+                        </button>
+                      </div>
+                    )}
                   </article>
                 );
               }

@@ -564,6 +564,7 @@
 
 .account-row {
   position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns:
     minmax(230px, 1.6fr)
@@ -592,6 +593,10 @@
 .account-row:hover {
   background:
     rgba(79, 209, 197, 0.025);
+}
+
+.account-row-menu-open {
+  z-index: 9999;
 }
 
 .account-identity {
@@ -701,83 +706,98 @@
 
 .account-menu-wrap {
   position: relative;
-  z-index: 1;
   display: flex;
   justify-content: flex-end;
-}
-
-.account-menu-wrap:has(.account-menu) {
-  z-index: 30;
+  align-items: center;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .account-menu-button {
+  position: relative;
+  z-index: 2;
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid
-    transparent;
+  border: 1px solid transparent;
   border-radius: 9px;
   color: #758b9c;
   background: transparent;
   cursor: pointer;
-  transition:
-    color 0.2s ease,
-    background 0.2s ease;
+  transition: color 0.2s ease, background 0.2s ease;
 }
 
 .account-menu-button:hover {
   color: #d7e8ee;
-  background:
-    rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.account-menu {
-  position: absolute;
-  z-index: 20;
-  top: 40px;
-  right: 0;
-  width: 185px;
-  padding: 5px;
-  border: 1px solid
-    rgba(255, 255, 255, 0.09);
-  border-radius: 11px;
-  background: #16232d;
-  box-shadow:
-    0 18px 45px
-      rgba(0, 0, 0, 0.3);
-  animation:
-    menuIn 0.18s ease both;
-}
-
-.account-menu button {
+/* Inline accordion actions: no floating dropdown/overlay */
+.account-actions-panel {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   width: 100%;
-  gap: 9px;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: 7px;
+  min-width: 0;
+  margin-top: -2px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 0 0 12px 12px;
+  background: rgba(255, 255, 255, 0.018);
+  animation: accountActionsIn 0.18s ease both;
+}
+
+.account-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 9px;
   color: #a9bac5;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.025);
   font-size: 11px;
-  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
-.account-menu button:hover {
+.account-action-button:hover {
   color: #edf5f7;
-  background:
-    rgba(255, 255, 255, 0.05);
+  background: rgba(79, 209, 197, 0.075);
+  border-color: rgba(79, 209, 197, 0.18);
+  transform: translateY(-1px);
 }
 
-.account-menu button.danger {
+.account-action-button svg {
+  flex: 0 0 auto;
+}
+
+.account-action-button.danger {
   color: #e59a9a;
 }
 
-.account-menu button.danger:hover {
-  background:
-    rgba(248, 113, 113, 0.07);
+.account-action-button.danger:hover {
+  color: #f1aaaa;
+  background: rgba(248, 113, 113, 0.07);
+  border-color: rgba(248, 113, 113, 0.15);
+}
+
+@keyframes accountActionsIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .accounts-empty {

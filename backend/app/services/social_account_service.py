@@ -306,42 +306,35 @@ def update_social_account(
         .select(SELECT_WITH_PLATFORM)
     )
 
-    if response.data:
-        return _attach_platform_info(
-            response.data[0]
-        )
-
-    # Some supabase-py / PostgREST configurations don't
-    # reliably return the updated row from an
-    # update().select() chain (e.g. missing
-    # "Prefer: return=representation", or RLS quirks).
-    # Rather than reporting a false failure when the
-    # write actually succeeded, re-fetch the row directly
-    # and only treat this as a real failure if it still
-    # doesn't reflect the change.
-    refreshed = get_social_account(
-        account_id,
-        user_id,
-    )
-
-    if not refreshed:
+    if not response.data:
         return None
 
-    mismatched = any(
-        refreshed.get(key) != value
-        for key, value in clean_data.items()
+    return _attach_platform_info(
+        response.data[0]
     )
-
-    if mismatched:
-        return None
-
-    return refreshed
 
 
 def delete_social_account(
     account_id: str,
     user_id: str,
 ):
+    # post_publications references social_accounts, so remove the
+    # publication links first. The posts themselves are preserved.
+    safe_execute(
+        supabase
+        .table("post_publications")
+        .delete()
+        .eq("account_id", account_id)
+    )
+
+    # Support schemas that use social_account_id for the FK.
+    safe_execute(
+        supabase
+        .table("post_publications")
+        .delete()
+        .eq("social_account_id", account_id)
+    )
+
     response = safe_execute(
         supabase
         .table("social_accounts")
@@ -350,17 +343,4 @@ def delete_social_account(
         .eq("user_id", user_id)
     )
 
-    if response.data:
-        return True
-
-    # Some supabase-py / PostgREST configurations don't
-    # return the deleted row(s) from a plain delete()
-    # call (no "Prefer: return=representation"). Confirm
-    # the row is actually gone instead of assuming
-    # failure just because `response.data` was empty.
-    still_exists = get_social_account(
-        account_id,
-        user_id,
-    )
-
-    return still_exists is None
+    return bool(response.data)
