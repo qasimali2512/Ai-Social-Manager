@@ -19,9 +19,22 @@ META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "").strip()
 LINKEDIN_VERSION = os.getenv("LINKEDIN_VERSION", "202608").strip()
 
 # X media upload (chunked INIT/APPEND/FINALIZE/STATUS flow).
-# Uses the newer /2/media/upload endpoint so it works with the
+# Uses the newer /2/media/upload endpoints so it works with the
 # same OAuth 2.0 user-context Bearer token already used for
 # /2/tweets, instead of requiring separate OAuth 1.0a credentials.
+#
+# NOTE: as of the 2025 X API v2 media migration, INIT/APPEND/
+# FINALIZE are no longer "command=" query/form params against a
+# single URL (the old v1.1 upload.twitter.com style) - each step
+# is now its own path:
+#   POST /2/media/upload/initialize        (JSON body)
+#   POST /2/media/upload/{id}/append       (multipart, id in path)
+#   POST /2/media/upload/{id}/finalize     (no body, id in path)
+#   GET  /2/media/upload?command=STATUS&media_id=...  (unchanged)
+# Sending the old-style flat body to the base URL is what caused
+# "media_category is not one of []" (INIT) and "Missing media
+# field in JSON" (APPEND/FINALIZE) - X no longer recognizes those
+# as valid fields for the base endpoint.
 X_MEDIA_UPLOAD_URL = "https://api.x.com/2/media/upload"
 X_MEDIA_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB per APPEND, X's documented max.
 X_MAX_IMAGES_PER_POST = 4
@@ -557,20 +570,13 @@ async def _x_upload_media(
     total_bytes = len(media_bytes)
     category = _x_media_category(content_type)
 
-    # INIT
-    #
-    # X's newer /2/media/upload endpoint expects a JSON body for
-    # INIT/FINALIZE (only APPEND is multipart/form-data). Sending
-    # these as form fields (the old v1.1-style `data=`) means the
-    # server never recognizes `media_category` at all, which is
-    # why it used to fail with "The query parameter [media_category]
-    # is not one of []" - an empty allowed-list, because form
-    # fields aren't part of this endpoint's schema.
+    # INIT - dedicated endpoint, JSON body. `media_id` doesn't
+    # exist yet at this point, so there's nothing to put in a
+    # path here.
     init_response = await client.post(
-        X_MEDIA_UPLOAD_URL,
+        f"{X_MEDIA_UPLOAD_URL}/initialize",
         headers=auth_headers,
         json={
-            "command": "INIT",
             "total_bytes": total_bytes,
             "media_type": content_type,
             "media_category": category,
@@ -588,16 +594,15 @@ async def _x_upload_media(
     if not media_id:
         return None, "X did not return a media id from the INIT step."
 
-    # APPEND, in 4MB chunks.
+    # APPEND, in 4MB chunks - multipart/form-data, media_id is
+    # now part of the URL path rather than a form field.
     segment_index = 0
     for offset in range(0, total_bytes, X_MEDIA_CHUNK_SIZE):
         chunk = media_bytes[offset:offset + X_MEDIA_CHUNK_SIZE]
         append_response = await client.post(
-            X_MEDIA_UPLOAD_URL,
+            f"{X_MEDIA_UPLOAD_URL}/{media_id}/append",
             headers=auth_headers,
             data={
-                "command": "APPEND",
-                "media_id": media_id,
                 "segment_index": str(segment_index),
             },
             files={"media": ("chunk", chunk, "application/octet-stream")},
@@ -606,11 +611,10 @@ async def _x_upload_media(
             return None, f"X media APPEND failed: {_error(append_response)}"
         segment_index += 1
 
-    # FINALIZE (also JSON - see note above on INIT).
+    # FINALIZE - media_id is in the path, no request body needed.
     finalize_response = await client.post(
-        X_MEDIA_UPLOAD_URL,
+        f"{X_MEDIA_UPLOAD_URL}/{media_id}/finalize",
         headers=auth_headers,
-        json={"command": "FINALIZE", "media_id": media_id},
     )
     if finalize_response.status_code >= 400:
         return None, f"X media FINALIZE failed: {_error(finalize_response)}"
@@ -622,7 +626,9 @@ async def _x_upload_media(
 
     processing_info = finalize_data.get("processing_info")
 
-    # Video/GIF uploads process asynchronously — poll STATUS until done.
+    # Video/GIF uploads process asynchronously — poll STATUS until
+    # done. Unlike INIT/APPEND/FINALIZE, STATUS was NOT moved to a
+    # dedicated path - it's still the base URL with query params.
     while processing_info and processing_info.get("state") in {"pending", "in_progress"}:
         wait_seconds = processing_info.get("check_after_secs", 2)
         await asyncio.sleep(wait_seconds)
@@ -636,7 +642,8 @@ async def _x_upload_media(
             return None, f"X media STATUS check failed: {_error(status_response)}"
 
         try:
-            status_data = status_response.json().get("data", {})
+            status_json = status_response.json()
+            status_data = status_json.get("data") or status_json
         except Exception:
             status_data = {}
 
