@@ -1,15 +1,22 @@
-🚀 AI Social Manager
-
 <div align="center">
 
-Create • Schedule • Publish • Analyze
+🤖 AI Social Manager
 
-AI-powered social media management platform for creating content, managing connected accounts, scheduling posts, and tracking performance from one dashboard.
+AI-Powered Social Media Management Platform
 
-<br/>
+Create content. Generate visuals. Connect platforms. Schedule posts. Publish everywhere. Analyze performance.
+
+<br>
 
 
 
+
+
+
+
+
+
+<br>
 
 
 
@@ -17,281 +24,381 @@ AI-powered social media management platform for creating content, managing conne
 
 </div>
 
-✨ Overview
+<br>
 
-AI Social Manager is a full-stack social media management application built to simplify the complete content workflow.
+✨ What is AI Social Manager?
 
-Instead of switching between different tools, users can manage content from a single workspace:
+AI Social Manager is a modern full-stack platform designed to bring the entire social-media workflow into one intelligent workspace.
 
-🤖 Generate AI-powered social media content
+Instead of creating content manually, switching between platforms, uploading media repeatedly, and tracking posts separately, the platform provides a centralized workflow for:
 
-🖼️ Generate and store post media
+AI Content → Media → Post → Schedule → Publish → Analytics
 
-✍️ Edit and manage posts
+🎯 The idea: Build one workspace that makes social-media management faster, smarter, and easier to automate.
 
-📅 Schedule publications
+🖥️ Platform at a Glance
 
-🔗 Connect social media accounts
+<div align="center">
 
-🚀 Publish content to supported platforms
+🤖 AI
 
-📊 View analytics and platform performance
-
-🔔 Manage notifications
-
-🗂️ Keep track of post history
-
-📋 Reuse content templates
-
-🔐 Handle authentication and protected application routes
-
-The application combines a React frontend, FastAPI backend, Supabase, Cloudflare Workers AI, OAuth integrations, and automation services into one platform.
-
-🎯 Project Goals
-
-The project was designed around a simple idea:
-
-Create once. Manage everywhere.
-
-The goal is to provide a centralized social media workspace where content creation, scheduling, publishing, account management, and analytics can be handled without maintaining separate workflows for every platform.
-
-🧩 Core Features
-
-🤖 AI Content Generation
-
-Generate social media copy based on:
-
-Topic
-
-Platform
-
-Tone
-
-Language
-
-Content length
-
-Hashtag preference
-
-Emoji preference
-
-The backend integrates directly with Cloudflare Workers AI for text generation.
-
-🖼️ AI Image Generation
-
-Generate post visuals using an AI image model and store generated media in Supabase Storage.
-
-Generated images can then be attached to posts and used as publication media.
-
-✍️ Post Composer
-
-Create and manage posts with:
-
-Title
-
-Caption/content
-
-Topic
-
-Tone
-
-Language
-
-Media
-
-Draft status
-
-Publication information
-
-📅 Content Calendar
-
-Manage scheduled content through the calendar interface and schedule publications for future dates.
-
-The backend also includes a scheduler loop that checks for due publications.
-
-🔗 Social Account Management
-
-The application contains platform/account management flows and OAuth support for supported integrations.
-
-Platform adapters are organized separately so publishing logic can be handled per platform.
+📅 Planning
 
 🚀 Publishing
 
-The backend includes publication and publishing services for handling:
+📊 Insights
 
-Immediate publishing
+Text Generation
 
-Scheduled publishing
+Content Calendar
 
-Publication records
+Multi-platform
 
-Platform/account resolution
+Analytics
 
-Media attachment
+Image Generation
+
+Scheduling
+
+OAuth Accounts
+
+Performance
+
+Smart Prompts
+
+Templates
+
+Publishing Queue
+
+Activity
+
+AI Workflows
+
+History
+
+Media Management
+
+Notifications
+
+</div>
+
+🌟 Features
+
+🤖 AI Content Generation
+
+Generate social-media content with AI based on the requirements of the post.
+
+✍️ AI-generated captions
+
+🎯 Topic-based content
+
+🎨 Tone selection
+
+🌍 Language support
+
+#️⃣ Hashtag generation
+
+😊 Emoji preferences
+
+📱 Platform-oriented content
+
+🎨 AI Image Generation
+
+Create visuals for social posts without leaving the application.
+
+Prompt
+  │
+  ▼
+Cloudflare Workers AI
+  │
+  ▼
+Generated Image
+  │
+  ▼
+Supabase Storage
+  │
+  ▼
+Attach to Post
+
+📝 Smart Post Composer
+
+Create, edit, save and manage posts from one interface.
+
+Post workflow:
+
+Draft → Edit → Schedule → Publish → Track
+
+Supports:
+
+Captions
+
+Topics
+
+Tone
+
+Languages
+
+Media
+
+Social accounts
+
+Publication date/time
+
+Drafts
 
 Publishing status
 
-📊 Analytics
+📅 Content Calendar
 
-The dashboard includes analytics-related functionality for monitoring social media performance and synchronizing analytics data.
+Plan your social content visually with a centralized calendar.
 
-🔔 Notifications
+Schedule future posts
 
-Users can:
+View planned content
 
-View notifications
+Manage publication dates
 
-Check unread notification count
+Track scheduled content
 
-Mark individual notifications as read
+Connect scheduled posts with the publishing system
 
-Mark all notifications as read
+🔗 Social Account Management
 
-🗂️ History
+Connect social platforms through OAuth-based account flows.
 
-The application provides a history section for previously generated/managed content and activity.
-
-📋 Templates
-
-Reusable content templates can be managed from the Templates section.
-
-🔐 Authentication
-
-The frontend uses an authentication context and protected routes to control access to application pages.
-
-🌐 Supported Platform Integrations
-
-The codebase contains platform adapters and OAuth configuration for:
+Integrations include:
 
 Platform
 
-Integration
+Purpose
 
-LinkedIn
-
-OAuth + publishing
-
-Facebook
-
-OAuth / social account flow
-
-Instagram
-
-OAuth / social account flow
-
-X
+🔵 LinkedIn
 
 OAuth + publishing
 
-YouTube
+🔵 Facebook
+
+Account / publishing flow
+
+🟣 Instagram
+
+Account / publishing flow
+
+⚫ X
 
 OAuth + publishing
 
-TikTok
+🔴 YouTube
 
-OAuth configuration + publishing flow
+OAuth + publishing
 
-Zernio
+⚫ TikTok
 
-Account connection / publishing integration
+OAuth + publishing flow
 
-Platform capabilities depend on the APIs, permissions, developer applications, account types, and access scopes configured for each provider.
+🟢 Zernio
+
+Account + publishing integration
+
+Platform capabilities depend on each provider's API permissions, scopes, developer application, and account requirements.
+
+🚀 Automated Publishing
+
+A dedicated publishing layer handles publication requests and scheduled posts.
+
+                    POST
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+       Publish Now          Schedule
+          │                     │
+          │                Scheduler
+          │                     │
+          └──────────┬──────────┘
+                     ▼
+               Publisher
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+       LinkedIn     X        YouTube
+          │          │          │
+          └──────────┴──────────┘
+                     ▼
+                  Status
+
+📊 Analytics Dashboard
+
+Track social-media activity and performance from the dashboard.
+
+Includes architecture for:
+
+Analytics synchronization
+
+Platform metrics
+
+Performance tracking
+
+Dashboard summaries
+
+Activity monitoring
+
+🔔 Notifications
+
+Stay informed about important account and publishing activity.
+
+🔴 Unread count
+
+📬 Notification list
+
+✅ Mark as read
+
+✅ Mark all as read
+
+📋 Templates
+
+Create reusable content templates to speed up repetitive content creation.
+
+🗂️ History
+
+Keep track of previously created and managed content from a centralized history section.
+
+🧠 AI Layer
+
+The AI layer is powered by Cloudflare Workers AI.
+
+Text Model
+
+@cf/zai-org/glm-4.7-flash
+
+Image Model
+
+@cf/black-forest-labs/flux-2-klein-9b
+
+AI Pipeline
+
+                 USER
+                   │
+                   ▼
+            Prompt / Topic
+                   │
+                   ▼
+            FastAPI Backend
+                   │
+          ┌────────┴────────┐
+          ▼                 ▼
+     Text Generation   Image Generation
+          │                 │
+          └────────┬────────┘
+                   ▼
+                Post
+                   │
+                   ▼
+             Supabase
 
 🏗️ Architecture
 
-┌───────────────────────────────────────────────────────────────┐
-│                       AI SOCIAL MANAGER                       │
-└───────────────────────────────────────────────────────────────┘
-                              │
-                ┌─────────────┴─────────────┐
-                │                           │
-        ┌───────▼────────┐         ┌────────▼────────┐
-        │ React Frontend │         │ FastAPI Backend │
-        │     + Vite     │         │     + Python    │
-        └───────┬────────┘         └────────┬────────┘
-                │                           │
-                │                  ┌────────┼───────────────┐
-                │                  │        │               │
-                │            ┌─────▼───┐ ┌──▼─────────┐ ┌──▼────────────┐
-                │            │ Supabase│ │ Cloudflare │ │ OAuth / Social│
-                │            │ DB/Store│ │ Workers AI │ │ Platforms     │
-                │            └─────────┘ └────────────┘ └───────────────┘
-                │
-                └────────────── API Requests ────────────────►
+<div align="center">
 
-🛠️ Tech Stack
+Full-Stack Architecture
 
-Frontend
+</div>
 
-React 19
+┌─────────────────────────────────────────────────────────────────┐
+│                         AI SOCIAL MANAGER                       │
+└─────────────────────────────────────────────────────────────────┘
 
-Vite 8
+                         USER / BROWSER
+                               │
+                               ▼
+                  ┌─────────────────────────┐
+                  │      React + Vite       │
+                  │                         │
+                  │  Dashboard              │
+                  │  Posts                  │
+                  │  Calendar               │
+                  │  Analytics              │
+                  │  Accounts               │
+                  │  Templates              │
+                  └────────────┬────────────┘
+                               │
+                            REST API
+                               │
+                               ▼
+                  ┌─────────────────────────┐
+                  │       FastAPI           │
+                  │                         │
+                  │  API Routers            │
+                  │  Services               │
+                  │  OAuth                  │
+                  │  Publishing             │
+                  │  Scheduler              │
+                  │  AI Services             │
+                  └───────┬─────┬─────┬──────┘
+                          │     │     │
+             ┌────────────┘     │     └─────────────┐
+             ▼                  ▼                   ▼
+      ┌────────────┐    ┌──────────────┐    ┌───────────────┐
+      │  Supabase  │    │ Cloudflare   │    │ Social APIs   │
+      │            │    │ Workers AI   │    │               │
+      │ DB         │    │              │    │ OAuth         │
+      │ Storage    │    │ Text + Image │    │ Publishing    │
+      └────────────┘    └──────────────┘    └───────────────┘
+                               │
+                               ▼
+                         ┌───────────┐
+                         │    n8n    │
+                         │Automation │
+                         └───────────┘
 
-React Router 7
+🧰 Tech Stack
 
-Axios
+<div align="center">
 
-Lucide React
+Layer
 
-CSS
+Technologies
 
-Backend
+🎨 Frontend
 
-Python
+React 19, Vite, React Router, Axios, Lucide React
 
-FastAPI
+⚡ Backend
 
-Pydantic Settings
+Python, FastAPI, Pydantic Settings, HTTPX
 
-HTTPX
+🗄️ Database
 
-REST API architecture
+Supabase / PostgreSQL
 
-Background scheduler loop
-
-Database & Storage
-
-Supabase
-
-PostgreSQL-backed database
+📦 Storage
 
 Supabase Storage
 
-Post/media/account/publication data
-
-AI
+🧠 AI
 
 Cloudflare Workers AI
 
-AI text generation
+🔐 Authentication
 
-AI image generation
+OAuth + application authentication
 
-Automation
+🔄 Automation
 
 n8n
 
-Approval/publishing automation support
+🌐 Integrations
 
-Integrations
+LinkedIn, Facebook, Instagram, X, YouTube, TikTok, Zernio
 
-LinkedIn
+🚀 Deployment
 
-Facebook
+Vercel / AWS-compatible deployment architecture
 
-Instagram
+</div>
 
-X
+📂 Project Structure
 
-YouTube
-
-TikTok
-
-Zernio
-
-📁 Project Structure
-
-ai-social-manager/
+AI-Social-Manager/
 │
 ├── backend/
 │   ├── app/
@@ -320,6 +427,7 @@ ai-social-manager/
 │   │   │   └── supabase.py
 │   │   │
 │   │   ├── schemas/
+│   │   │
 │   │   ├── services/
 │   │   │   ├── ai_post_service.py
 │   │   │   ├── analytics_service.py
@@ -363,77 +471,35 @@ ai-social-manager/
 │   ├── package.json
 │   └── vite.config.js
 │
+├── screenshots/
+│   ├── landing.png
+│   ├── dashboard.png
+│   ├── create-post.png
+│   ├── calendar.png
+│   └── analytics.png
+│
+├── .gitignore
 └── README.md
 
-🔄 Application Flow
+⚙️ Installation
 
-1. Generate Content
-
-User
-  ↓
-Create Post
-  ↓
-Select topic / tone / language / platform
-  ↓
-FastAPI API
-  ↓
-Cloudflare Workers AI
-  ↓
-Generated caption
-
-2. Generate Image
-
-User Prompt
-    ↓
-FastAPI
-    ↓
-Cloudflare Workers AI
-    ↓
-Generated Image
-    ↓
-Supabase Storage
-    ↓
-Post Media
-
-3. Schedule a Post
-
-Create Post
-    ↓
-Select Social Account
-    ↓
-Choose Date & Time
-    ↓
-Create Publication
-    ↓
-Scheduler
-    ↓
-Due Publication
-    ↓
-Publisher
-    ↓
-Social Platform
-
-🚀 Getting Started
-
-1. Clone the Repository
+1. Clone
 
 git clone https://github.com/YOUR_USERNAME/ai-social-manager.git
 cd ai-social-manager
 
-2. Backend Setup
-
-Open the backend directory:
+2. Backend
 
 cd backend
 
-Create a virtual environment:
+Create virtual environment:
 
 Windows
 
 python -m venv venv
 venv\Scripts\activate
 
-macOS / Linux
+Linux / macOS
 
 python3 -m venv venv
 source venv/bin/activate
@@ -442,26 +508,50 @@ Install dependencies:
 
 pip install -r requirements.txt
 
-3. Backend Environment Variables
+Run backend:
+
+uvicorn app.main:app --reload
+
+API:
+
+http://127.0.0.1:8000
+
+Docs:
+
+http://127.0.0.1:8000/docs
+
+🎨 Frontend
+
+Open another terminal:
+
+cd frontend
+npm install
+npm run dev
+
+Frontend:
+
+http://localhost:5173
+
+Production build:
+
+npm run build
+
+🔐 Environment Variables
 
 Create:
 
 backend/.env
 
-Use the following structure:
-
-# Supabase
-SUPABASE_URL=
-SUPABASE_KEY=
+Example configuration:
 
 # Application
-DEMO_USER_ID=
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://127.0.0.1:8000
 REQUIRE_AUTH=false
 
-# n8n
-N8N_APPROVAL_WEBHOOK_URL=
+# Supabase
+SUPABASE_URL=
+SUPABASE_KEY=
 
 # Cloudflare Workers AI
 CLOUDFLARE_ACCOUNT_ID=
@@ -470,18 +560,21 @@ CLOUDFLARE_TEXT_MODEL=@cf/zai-org/glm-4.7-flash
 CLOUDFLARE_IMAGE_MODEL=@cf/black-forest-labs/flux-2-klein-9b
 CLOUDFLARE_IMAGE_STEPS=20
 
+# n8n
+N8N_APPROVAL_WEBHOOK_URL=
+
 # LinkedIn
 LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=
 LINKEDIN_SCOPES=openid profile email w_member_social
 
-# YouTube / Google
+# YouTube
 YOUTUBE_CLIENT_ID=
 YOUTUBE_CLIENT_SECRET=
 YOUTUBE_SCOPES=https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly
 YOUTUBE_REDIRECT_URI=
 
-# Meta - Facebook / Instagram
+# Meta
 META_CLIENT_ID=
 META_CLIENT_SECRET=
 META_SCOPES=pages_show_list pages_read_engagement instagram_basic instagram_content_publish
@@ -502,314 +595,97 @@ TIKTOK_CLIENT_SECRET=
 TIKTOK_REDIRECT_URI=
 TIKTOK_SCOPES=user.info.basic video.publish
 
-⚠️ Never commit real API keys, OAuth secrets, Supabase service credentials, or tokens to GitHub.
-
-4. Database Setup
-
-Create/configure a Supabase project and apply the SQL schema from:
-
-backend/app/db/schema.sql
-
-Then configure:
-
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_KEY=your_supabase_key
-
-For generated images, configure the required Supabase Storage bucket used by the backend.
-
-5. Start the Backend
-
-From:
-
-backend/
-
-run:
-
-uvicorn app.main:app --reload
-
-Backend:
-
-http://127.0.0.1:8000
-
-Health check:
-
-http://127.0.0.1:8000/health
-
-API root:
-
-http://127.0.0.1:8000/
-
-6. Frontend Setup
-
-Open a second terminal:
-
-cd frontend
-
-Install dependencies:
-
-npm install
-
-Start development server:
-
-npm run dev
-
-The Vite development server normally runs at:
-
-http://localhost:5173
-
-🔐 Frontend Environment
-
-Create:
-
-frontend/.env
-
-Configure the frontend variables expected by your frontend Supabase/API configuration.
-
-Example:
-
-VITE_API_BASE_URL=http://127.0.0.1:8000
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-
-Use the exact variable names required by the frontend code/configuration in your deployment.
-
-🧪 Development Commands
-
-Frontend
-
-npm run dev
-
-Production build:
-
-npm run build
-
-Preview production build:
-
-npm run preview
-
-Lint:
-
-npm run lint
-
-Backend
-
-Development server:
-
-uvicorn app.main:app --reload
-
-Production-style server:
-
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-🔌 API Modules
-
-The FastAPI backend is organized into modular routers:
-
-Module
-
-Purpose
-
-/analytics
-
-Analytics and synchronization
-
-/calendar
-
-Calendar events
-
-/dashboard
-
-Dashboard data
-
-/generate
-
-AI content generation
-
-/media
-
-Media upload and management
-
-/notifications
-
-Notifications
-
-/oauth
-
-Social platform OAuth
-
-/platforms
-
-Platform configuration
-
-/posts
-
-Post CRUD and media
-
-/publications
-
-Publication scheduling
-
-/publish
-
-Publishing
-
-/scheduler
-
-Scheduled post processing
-
-/social_accounts
-
-Connected accounts
-
-/zernio
-
-Zernio integration
-
-🧠 AI Layer
-
-The application currently uses Cloudflare Workers AI directly from the backend for AI generation.
-
-Text Generation
-
-Configured model:
-
-@cf/zai-org/glm-4.7-flash
-
-Image Generation
-
-Configured model:
-
-@cf/black-forest-labs/flux-2-klein-9b
-
-The AI service handles:
-
-Prompt construction
-
-Text generation
-
-Image generation
-
-API response parsing
-
-Base64 image handling
-
-Error handling
-
-🗃️ Media Storage
-
-Generated images are uploaded to Supabase Storage.
-
-The backend stores media information in the database and associates media with posts.
-
-AI Image
-   ↓
-Base64
-   ↓
-FastAPI
-   ↓
-Supabase Storage
-   ↓
-Public Media URL
-   ↓
-Post / Post Media
-
-🔐 Security Notes
-
-Before deploying this project:
-
-Keep .env files out of Git
-
-Rotate any credentials that were accidentally exposed
-
-Use restricted API tokens where possible
-
-Configure OAuth redirect URLs correctly
-
-Use HTTPS in production
-
-Configure appropriate CORS origins
-
-Avoid logging full secrets or access tokens
-
-Use production authentication settings
-
-Review provider-specific permissions/scopes
-
-🌍 Production Deployment
-
-The application can be deployed as two major parts:
-
-                    Internet
-                       │
-              ┌────────▼────────┐
-              │   Frontend      │
-              │ React + Vite    │
-              └────────┬────────┘
-                       │
-                    HTTPS
-                       │
-              ┌────────▼────────┐
-              │    Backend      │
-              │    FastAPI      │
-              └──────┬─┬─┬──────┘
-                     │ │ │
-          ┌──────────┘ │ └──────────┐
-          ▼            ▼            ▼
-      Supabase      Cloudflare   Social APIs
-      DB/Storage      Workers AI   + OAuth
-
-For production, update:
-
-FRONTEND_URL=https://your-frontend-domain.com
-BACKEND_URL=https://your-backend-domain.com
-
-and configure every OAuth provider with the production callback URL.
+⚠️ Security
+
+Never push real secrets to GitHub.
+
+Keep these files private:
+
+.env
+.env.local
+.env.production
+
+🔄 Core Workflow
+
+<div align="center">
+
+┌──────────────┐
+│   💡 IDEA    │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│  🤖 AI TEXT  │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ 🎨 AI MEDIA  │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ 📝 EDIT POST │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ 📅 SCHEDULE  │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ 🚀 PUBLISH   │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ 📊 ANALYZE   │
+└──────────────┘
+
+</div>
 
 📸 Screenshots
 
-Add your project screenshots here after pushing the repository:
+Add your real screenshots to the screenshots/ directory.
 
-## 📸 Screenshots
+🏠 Landing Page
 
-### Landing Page
-![Landing Page](./screenshots/landing.png)
+<img src="./screenshots/landing.png" alt="AI Social Manager Landing Page" width="900"/>
 
-### Dashboard
-![Dashboard](./screenshots/dashboard.png)
+📊 Dashboard
 
-### Create Post
-![Create Post](./screenshots/create-post.png)
+<img src="./screenshots/dashboard.png" alt="AI Social Manager Dashboard" width="900"/>
 
-### Analytics
-![Analytics](./screenshots/analytics.png)
+✍️ Create Post
 
-Recommended GitHub folder:
+<img src="./screenshots/create-post.png" alt="AI Social Manager Create Post" width="900"/>
 
-screenshots/
-├── landing.png
-├── dashboard.png
-├── create-post.png
-├── calendar.png
-├── analytics.png
-└── accounts.png
+📅 Calendar
+
+<img src="./screenshots/calendar.png" alt="AI Social Manager Calendar" width="900"/>
+
+📈 Analytics
+
+<img src="./screenshots/analytics.png" alt="AI Social Manager Analytics" width="900"/>
 
 🗺️ Roadmap
+
+✅ Completed
 
 AI text generation
 
 AI image generation
 
-Post creation
+Post composer
 
-Media storage
+Media management
 
-Social account management
+Supabase storage
+
+Social account architecture
 
 OAuth architecture
 
-Scheduling system
+Content calendar
 
-Publishing architecture
+Post scheduling
+
+Publishing service
 
 Analytics module
 
@@ -819,100 +695,117 @@ Templates
 
 History
 
-Advanced AI content optimization
+n8n automation support
 
-Deeper platform-specific analytics
+🚧 Planned
 
-Improved campaign management
+Advanced content optimization
 
-Advanced approval workflows
+AI-powered hashtag recommendations
 
-More automated content recommendations
+Better platform-specific analytics
 
-Expanded platform integrations
+Campaign management
 
-💡 Why This Project?
+Team collaboration
 
-Managing multiple social platforms manually can become repetitive:
+Approval workflows
 
-Create content
-     ↓
-Resize / prepare media
-     ↓
-Open platform
-     ↓
-Write caption
-     ↓
-Upload media
-     ↓
-Schedule
-     ↓
-Repeat...
+AI content recommendations
 
-AI Social Manager aims to turn that into:
+More social integrations
 
-              AI SOCIAL MANAGER
+Advanced reporting
 
-                    ↓
+🧪 Development
 
-        Generate → Edit → Schedule
-                    ↓
-                 Publish
-                    ↓
-                Analyze
+Backend
 
-One workspace. One workflow.
+cd backend
+uvicorn app.main:app --reload
+
+Frontend
+
+cd frontend
+npm run dev
+
+Production Build
+
+cd frontend
+npm run build
 
 🤝 Contributing
 
-Contributions are welcome.
+Contributions, ideas, and improvements are welcome.
 
-Fork the repository
+# Fork the repository
 
-Create a feature branch
+git checkout -b feature/amazing-feature
 
-git checkout -b feature/your-feature
+git add .
 
-Commit your changes
+git commit -m "Add amazing feature"
 
-git commit -m "Add your feature"
+git push origin feature/amazing-feature
 
-Push the branch
+Then open a Pull Request.
 
-git push origin feature/your-feature
+🐛 Bug Reports
 
-Open a Pull Request
+Found something wrong?
 
-🐛 Issues & Feedback
+Open an issue and include:
 
-If you find a bug or have an improvement idea, please open an issue with:
+What happened?
 
-Clear description
+What did you expect?
 
 Steps to reproduce
 
-Expected behavior
+Screenshots
 
-Actual behavior
+Console/server logs
 
-Relevant logs/screenshots
+Environment information
 
-Environment details
-
-📄 License
-
-Add your preferred license before publishing the repository.
-
-For example:
-
-MIT License
+📌 Project Status
 
 <div align="center">
 
-⭐ If you find this project interesting, consider giving it a star!
+🟢 Active Development
 
-AI Social Manager — AI-powered social media management from one workspace.
+AI Social Manager is an evolving project focused on combining AI + Automation + Social Media APIs into a single full-stack application.
 
-Built with ❤️ using React, FastAPI, Supabase & Cloudflare Workers AI.
+</div>
+
+💻 Built With
+
+<div align="center">
+
+React · Vite · FastAPI · Python · Supabase · Cloudflare Workers AI · n8n · OAuth · REST APIs
+
+</div>
+
+📄 License
+
+This project is licensed under the MIT License.
+
+See the LICENSE file for details.
+
+<div align="center">
+
+⭐ Like the Project?
+
+If AI Social Manager helped or inspired you, consider giving the repository a ⭐
+
+<br>
+
+Build smarter. Automate better. Manage everything from one place.
+
+<br>
+
+AI Social Manager
+
+AI • Automation • Social Media • Full Stack
 
 </div>
