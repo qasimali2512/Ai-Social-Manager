@@ -525,70 +525,8 @@ Production build:
 npm run build
 ```
 
----
 
-# 🔐 Environment Variables
 
-Create:
-
-```text
-backend/.env
-```
-
-Example:
-
-```env
-# Application
-FRONTEND_URL=http://localhost:5173
-BACKEND_URL=http://127.0.0.1:8000
-REQUIRE_AUTH=false
-
-# Supabase
-SUPABASE_URL=
-SUPABASE_KEY=
-
-# Cloudflare Workers AI
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_API_TOKEN=
-CLOUDFLARE_TEXT_MODEL=@cf/zai-org/glm-4.7-flash
-CLOUDFLARE_IMAGE_MODEL=@cf/black-forest-labs/flux-2-klein-9b
-CLOUDFLARE_IMAGE_STEPS=20
-
-# n8n
-N8N_APPROVAL_WEBHOOK_URL=
-
-# LinkedIn
-LINKEDIN_CLIENT_ID=
-LINKEDIN_CLIENT_SECRET=
-LINKEDIN_SCOPES=openid profile email w_member_social
-
-# YouTube
-YOUTUBE_CLIENT_ID=
-YOUTUBE_CLIENT_SECRET=
-YOUTUBE_SCOPES=https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly
-YOUTUBE_REDIRECT_URI=
-
-# Meta
-META_CLIENT_ID=
-META_CLIENT_SECRET=
-META_SCOPES=pages_show_list pages_read_engagement instagram_basic instagram_content_publish
-
-# X
-X_CLIENT_ID=
-X_CLIENT_SECRET=
-X_SCOPES=tweet.read tweet.write users.read offline.access media.write
-
-# Zernio
-ZERNIO_API_KEY=
-ZERNIO_PROFILE_ID=
-ZERNIO_API_BASE_URL=https://zernio.com/api/v1
-
-# TikTok
-TIKTOK_CLIENT_KEY=
-TIKTOK_CLIENT_SECRET=
-TIKTOK_REDIRECT_URI=
-TIKTOK_SCOPES=user.info.basic video.publish
-```
 
 ### 🚨 Important
 
@@ -607,37 +545,7 @@ node_modules/
 dist/
 ```
 
----
 
-# 📸 Screenshots
-
-Add your actual application screenshots inside:
-
-```text
-screenshots/
-```
-
-Recommended:
-
-```text
-screenshots/
-├── landing.png
-├── dashboard.png
-├── create-post.png
-├── calendar.png
-├── accounts.png
-└── analytics.png
-```
-
-Then display them like:
-
-```md
-<div align="center">
-
-<img src="./screenshots/dashboard.png" width="900"/>
-
-</div>
-```
 
 ---
 
